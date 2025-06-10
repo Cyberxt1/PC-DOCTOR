@@ -208,7 +208,12 @@ header {
   background: #3578c6;
 }
 
-@media (max-width: 400px) {
+@media (max-width: 600px) {
+
+  body, html {
+    padding: 0;
+    border-radius: 0px;
+  }
 
   nav .tab-btn {
   padding: 0.65rem 1.2rem;
@@ -229,19 +234,21 @@ header {
 
   }
   
-.nav-div {
-  display: flex;
-  flex: auto;
-  overflow-x: scroll;
-}
+  .nav-div {
+    display: flex;
+    flex: auto;
+    overflow-x: scroll;
+  }
 
   #dashboard {
-    border-radius: 10px;
+    /* border-radius: 10px; */
     box-shadow: none;
-    /* width:  fit-content; */
+    max-width:  100vw;
     min-height: 100vh;
     padding: 10px;
     overflow-x: hidden;
+    width: 1000px;
+
   }
   header {
     border-radius: 0;
