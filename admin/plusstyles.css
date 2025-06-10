@@ -207,9 +207,14 @@ body {
   width: 100%;
 }
 
-.troubleshooting-logs, .technician-management {
-  height: 50vh;
+.troubleshooting-logs,
+.technician-management {
+  height: 48vh;
   overflow-y: scroll;
+}
+
+.hide-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 table {
@@ -240,7 +245,6 @@ th {
 tr:not(:last-child) td {
   border-bottom: 1px solid var(--border);
 }
-
 
 .dashgrid-2 {
   height: ;
@@ -296,7 +300,6 @@ tr:not(:last-child) td {
   color: #f5f7fa;
   cursor: not-allowed;
 }
-
 
 /* === Alert Center === */
 .alert-list {
@@ -425,7 +428,6 @@ tr:not(:last-child) td {
   color: var(--text);
   transition: border var(--transition), background var(--transition);
 }
-
 
 .chat-input button {
   background: var(--primary);
