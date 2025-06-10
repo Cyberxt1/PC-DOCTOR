@@ -7,6 +7,7 @@ body, html {
   min-height: 100vh;
   display: flex;
   justify-content: center;
+  overflow-x: hidden;
 }
 .centered {
   display: flex;
@@ -209,6 +210,21 @@ header {
 
 @media (max-width: 700px) {
 
+  nav .tab-btn {
+  padding: 0.65rem 1.2rem;
+  border: none;
+  border-radius: 5px;
+  background: #6366f1;
+  color: #fff;
+  font-weight: 500;
+  font-size: smaller;
+  display: flex;
+  cursor: pointer;
+  margin: 0.2rem 0;
+  transition: background 0.15s;
+  flex-wrap: wrap;
+}
+  }
   
   #dashboard {
     border-radius: 10px;
