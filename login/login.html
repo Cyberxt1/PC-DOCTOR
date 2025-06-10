@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Login</title>
   <link rel="stylesheet" href="login.css" />
-
 </head>
 
 <body>
@@ -41,68 +40,67 @@
       </div>
     </div>
   </header>
-  <!-- Add this before your login.js script -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 
-  // Your Firebase config - make sure this matches your project config exactly
-  const firebaseConfig = {
-    apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
-    authDomain: "techfix-ef115.firebaseapp.com",
-    projectId: "techfix-ef115",
-    storageBucket: "techfix-ef115.firebasestorage.app",
-    messagingSenderId: "798114675752",
-    appId: "1:798114675752:web:33450b57585b4a643b891d",
-    measurementId: "G-69MKL5ETH7"
-  };
+    // Your Firebase config - make sure this matches your project config exactly
+    const firebaseConfig = {
+      apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
+      authDomain: "techfix-ef115.firebaseapp.com",
+      projectId: "techfix-ef115",
+      storageBucket: "techfix-ef115.firebasestorage.app",
+      messagingSenderId: "798114675752",
+      appId: "1:798114675752:web:33450b57585b4a643b891d",
+      measurementId: "G-69MKL5ETH7"
+    };
 
-  // List of admin emails - replace with your admin emails
-  const ADMIN_EMAILS = [
-    "oluokundavid4@gmail.com",
-    "admin2@email.com"
-  ];
+    // List of admin emails - replace with your admin emails
+    const ADMIN_EMAILS = [
+      "oluokundavid4@gmail.com",
+      "admin2@email.com"
+    ];
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const provider = new GoogleAuthProvider();
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
 
-  // Google login button click handler
-  document.getElementById('google-login-btn').addEventListener('click', () => {
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        const user = result.user;
-        console.log('User signed in:', user);
+    // Only redirect if not coming from logout
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromLogout = urlParams.get('logout') === '1';
 
-        // Check if user email is in the admin list
+    // Google login button click handler
+    document.getElementById('google-login-btn').addEventListener('click', () => {
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          const user = result.user;
+          if (ADMIN_EMAILS.includes(user.email)) {
+            window.location.href = '../admin/admin.html';
+          } else {
+            window.location.href = '../user/user.html';
+          }
+        })
+        .catch((error) => {
+          alert('Login failed: ' + error.message);
+        });
+    });
+
+    // On login page load, only auto-redirect if user is already authenticated and did NOT just log out
+    onAuthStateChanged(auth, (user) => {
+      if (user && !fromLogout) {
         if (ADMIN_EMAILS.includes(user.email)) {
-          // Redirect admin
           window.location.href = '../admin/admin.html';
         } else {
-          // Redirect regular user
           window.location.href = '../user/user.html';
         }
-      })
-      .catch((error) => {
-        console.error('Error during sign-in:', error);
-        alert('Login failed: ' + error.message);
-      });
-  });
-
-  // Optional: Detect if user is already logged in, redirect accordingly
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      if (ADMIN_EMAILS.includes(user.email)) {
-        window.location.href = '../admin/admin.html';
-      } else {
-        window.location.href = '../user/user.html';
       }
-    }
-  });
-</script>
+    });
 
-  <script src="login.js"></script>
+    // (Optional) expose a logout helper for other pages
+    window.techfixLogout = () => signOut(auth).then(() => {
+      window.location.href = "login.html?logout=1";
+    });
+  </script>
 </body>
-
 </html>
