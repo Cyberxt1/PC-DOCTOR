@@ -18,7 +18,7 @@
           <li><a href="#">Home</a></li>
           <li><a href="#">Alerts</a></li>
           <li><a href="#">Settings</a></li>
-          <li><a href="../login/login.html">Logout</a></li>
+          <li><a href="#" id="logout-link">Logout</a></li>
         </ul>
         <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
           <span></span><span></span><span></span>
@@ -27,11 +27,8 @@
     </nav>
   </header>
 
-
   <div class="app-container">
-    <!-- Main Content -->
     <main class="main-content">
-      <!-- Gridddddddddddddddddddddddddddddddddddddddddddddddd -->
       <div class="dashboard-grid">
         <!-- User Overview Panel -->
         <section class="card user-overview">
@@ -50,19 +47,19 @@
           <div class="stats-row">
             <div class="stat-card">
               <div class="stat-label">Total Users</div>
-              <div class="stat-value">2,450</div>
+              <div class="stat-value">0</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Active Sessions</div>
-              <div class="stat-value">312</div>
+              <div class="stat-value">0</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Flagged Users</div>
-              <div class="stat-value stat-flagged">5</div>
+              <div class="stat-value stat-flagged">0</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Total Admins</div>
-              <div class="stat-value">1</div>
+              <div class="stat-value">0</div>
             </div>
           </div>
         </section>
@@ -87,39 +84,15 @@
                   <th>Status</th>
                   <th>Last Check</th>
                   <th>Owner</th>
-                  <!-- <th>Remote Tools</th> -->
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>HP EliteBook 840</td>
-                  <td><span class="badge healthy">Fixed</span></td>
-                  <td>2025-06-07 11:54</td>
-                  <td>user1@gmail.com</td>
-                </tr>
-                <tr>
-                  <td>Dell XPS 13</td>
-                  <td><span class="badge issues">Pending</span></td>
-                  <td>2025-06-07 10:41</td>
-                  <td>user2@gmail.com</td>
-
-                </tr>
-                <tr>
-                  <td>Lenovo ThinkPad X1</td>
-                  <td><span class="badge issues">Pending</span></td>
-                  <td>2025-06-06 23:22</td>
-                  <td>user3@gmail.com</td>
-
-                </tr>
-              </tbody>
+              <tbody id="device-status-tbody"></tbody>
             </table>
           </div>
         </section>
       </div>
 
-
       <div class="dashboard-grid">
-
         <!-- Troubleshooting Logs -->
         <section class="card troubleshooting-logs">
           <div class="card-header">
@@ -147,34 +120,12 @@
                   <th>Fix</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>2025-06-07 09:15</td>
-                  <td>lucy.w</td>
-                  <td>Dell XPS 13</td>
-                  <td>Software</td>
-                  <td>Remote scan, cleanup, update</td>
-                </tr>
-                <tr>
-                  <td>2025-06-06 18:03</td>
-                  <td>tom.b</td>
-                  <td>HP EliteBook 840</td>
-                  <td>Hardware</td>
-                  <td>Fan check, temperature resolved</td>
-                </tr>
-                <tr>
-                  <td>2025-06-06 11:45</td>
-                  <td>alex.p</td>
-                  <td>Lenovo ThinkPad X1</td>
-                  <td>Network</td>
-                  <td>Driver update, connection reset</td>
-                </tr>
-              </tbody>
+              <tbody id="logs-tbody"></tbody>
             </table>
           </div>
         </section>
 
-        <!-- Technician Management -->
+        <!-- Technician Management (static for now) -->
         <section class="card technician-management">
           <div class="card-header">
             <h2>Technician Management</h2>
@@ -235,70 +186,36 @@
             </table>
           </div>
         </section>
-
       </div>
 
-      <!-- Griddddddddddddddddddddddddddddddddddddddddddddddddddddddddd -->
       <div class="dashboard-grid grid-2">
-        <!-- Alert Center -->
+        <!-- Alert Center (static for now) -->
         <section class="card alert-center">
           <div class="card-header">
             <h2>New Alerts</h2>
           </div>
-          <ul class="alert-list">
-            <li class="alert alert-overheating">
-              <span class="alert-icon"> <span>My laptop is overheating</span></span>
-
-              <button class="badge resolve">Respond</button>
-            </li>
-            <li class="alert alert-storage">
-              <span class="alert-icon"><span>Storage full on Dell XPS 13</span></span>
-
-              <button class="badge resolve">Respond</button>
-            </li>
-            <li class="alert alert-failedscan">
-              <span class="alert-icon"><span>Failed scan on Lenovo ThinkPad X1</span></span>
-
-              <button class="badge resolve">Respond</button>
-            </li>
-          </ul>
+          <ul class="alert-list"></ul>
         </section>
-        <!-- Chat / Support Interface -->
+        <!-- Chat / Support Interface (static for now) -->
         <section class="card chat-support">
           <div class="card-header">
             <h2>Live Support</h2>
             <span class="chat-status online">Online</span>
           </div>
-          <div class="chat-window">
-            <div class="chat-message user">
-              <span class="avatar">JD</span>
-              <div class="msg">Hi, I'm having trouble with my laptop overheating.</div>
-            </div>
-            <div class="chat-message support">
-              <span class="avatar">OD</span>
-              <div class="msg">Hello Jane, I see the alert. I'll start a remote scan now.</div>
-            </div>
-            <div class="chat-message user">
-              <span class="avatar">JD</span>
-              <div class="msg">Thank you!</div>
-            </div>
-          </div>
+          <div class="chat-window"></div>
           <div class="chat-input">
             <input type="text" id="input-chat-msg" placeholder="Type your message..." />
             <button>Send</button>
           </div>
         </section>
       </div>
-
-
-
     </main>
   </div>
 
   <script>
+    // Hamburger nav toggle
     const navToggle = document.getElementById('navToggle');
     const navLinks = document.getElementById('navLinks');
-
     navToggle.addEventListener('click', () => {
       navLinks.classList.toggle('active');
     });
@@ -306,5 +223,4 @@
 
   <script type="module" src="./admin.js"></script>
 </body>
-
 </html>

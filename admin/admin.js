@@ -1,11 +1,9 @@
-// TechFix Admin Dashboard
-// Place in your admin folder, load with <script type="module" src="./admin.js"></script>
-
+// TechFix Admin Dashboard - dynamic, Firebase-powered
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// --- Firebase config ---
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",
@@ -17,7 +15,7 @@ const firebaseConfig = {
 };
 
 const ADMIN_EMAILS = [
-  "oluokundavid4@gmail.com",  // replace with your real admins
+  "admin1@email.com", // replace with your real admins
   "admin2@email.com"
 ];
 
@@ -25,26 +23,27 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- DOM Elements (add these IDs/classes to your HTML if missing) ---
-const statsTotalUsers = document.querySelector('.stat-value'); // 1st .stat-value for total users
-const statsActiveSessions = document.querySelectorAll('.stat-value')[1];
-const statsFlagged = document.querySelectorAll('.stat-value')[2];
-const statsAdmins = document.querySelectorAll('.stat-value')[3];
-const deviceTableBody = document.querySelector('.device-status tbody');
-const logsTableBody = document.querySelector('.troubleshooting-logs tbody');
+// Stats selectors (update if you change stat card order)
+const statTotalUsers = document.querySelectorAll('.stat-value')[0];
+const statActiveSessions = document.querySelectorAll('.stat-value')[1];
+const statFlagged = document.querySelectorAll('.stat-value')[2];
+const statAdmins = document.querySelectorAll('.stat-value')[3];
 
-// --- Auth: Only Allow Admins ---
+// Table bodies
+const deviceStatusTbody = document.getElementById('device-status-tbody');
+const logsTbody = document.getElementById('logs-tbody');
+
+// --- Auth: Only allow admins ---
 onAuthStateChanged(auth, user => {
   if (!user || !ADMIN_EMAILS.includes(user.email)) {
-    alert("You are not authorized to access this dashboard.");
+    alert("You are not authorized.");
     window.location.href = "../login/login.html";
     return;
   }
-  // Load users live
   liveLoadUsers();
 });
 
-// --- Live Load All Users and Their Data ---
+// --- Live load all users and their data ---
 function liveLoadUsers() {
   const usersCol = collection(db, "users");
   onSnapshot(usersCol, (snapshot) => {
@@ -58,49 +57,43 @@ function liveLoadUsers() {
   });
 }
 
-// --- Update User Stats ---
+// --- Update Stats ---
 function updateStats(users) {
-  statsTotalUsers.textContent = users.length;
-  statsAdmins.textContent = users.filter(u => ADMIN_EMAILS.includes(u.email)).length;
-  statsActiveSessions.textContent = Math.floor(users.length * 0.2 + 1); // fake value; replace with real if you track sessions
-  statsFlagged.textContent = users.filter(u => u.flagged).length;
+  statTotalUsers.textContent = users.length;
+  statAdmins.textContent = users.filter(u => ADMIN_EMAILS.includes(u.email)).length;
+  statActiveSessions.textContent = Math.floor(users.length * 0.25) + 1; // fake value; real requires tracking sessions
+  statFlagged.textContent = users.filter(u => u.flagged).length;
 }
 
-// --- Device Table: Show Most Recent Device Issue Per User ---
+// --- Device Table (latest issue per user) ---
 function updateDeviceTable(users) {
-  deviceTableBody.innerHTML = "";
-  const latestIssues = [];
+  deviceStatusTbody.innerHTML = "";
   users.forEach(user => {
     if (Array.isArray(user.history) && user.history.length > 0) {
       const latest = [...user.history].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
-      latestIssues.push({ ...latest, owner: user.email, uid: user.id });
-    }
-  });
-
-  latestIssues.forEach(entry => {
-    const tr = document.createElement('tr');
-    let deviceLabel = entry.device === 'laptop'
-      ? (entry.details.match(/Processor: (.*?),/) ? entry.details.match(/Processor: (.*?),/)[1] : "Laptop")
-      : (entry.device === 'phone'
-          ? (entry.details.match(/Model: (.*)/) ? entry.details.match(/Model: (.*)/)[1] : "Phone")
+      const tr = document.createElement('tr');
+      let deviceLabel = latest.device === 'laptop'
+        ? (latest.details.match(/Processor: (.*?),/) ? latest.details.match(/Processor: (.*?),/)[1] : "Laptop")
+        : (latest.device === 'phone'
+          ? (latest.details.match(/Model: (.*)/) ? latest.details.match(/Model: (.*)/)[1] : "Phone")
           : "Other");
 
-    const status = entry.resolved ? "Fixed" : "Pending";
-    const badgeClass = entry.resolved ? "healthy" : "issues";
-
-    tr.innerHTML = `
-      <td>${deviceLabel}</td>
-      <td><span class="badge ${badgeClass}">${status}</span></td>
-      <td>${formatDate(entry.time)}</td>
-      <td>${entry.owner}</td>
-    `;
-    deviceTableBody.appendChild(tr);
+      const status = latest.resolved ? "Fixed" : "Pending";
+      const badgeClass = latest.resolved ? "healthy" : "issues";
+      tr.innerHTML = `
+        <td>${deviceLabel}</td>
+        <td><span class="badge ${badgeClass}">${status}</span></td>
+        <td>${formatDate(latest.time)}</td>
+        <td>${user.email}</td>
+      `;
+      deviceStatusTbody.appendChild(tr);
+    }
   });
 }
 
-// --- Logs Table: Show All Issues from All Users ---
+// --- Logs Table (all issues from all users) ---
 function updateLogsTable(users) {
-  logsTableBody.innerHTML = "";
+  logsTbody.innerHTML = "";
   const allIssues = [];
   users.forEach(user => {
     if (Array.isArray(user.history)) {
@@ -121,18 +114,18 @@ function updateLogsTable(users) {
         ${entry.resolved ? "Resolved" : `<button class="resolve-btn" data-uid="${entry.uid}" data-time="${entry.time}">Mark Resolved</button>`}
       </td>
     `;
-    logsTableBody.appendChild(tr);
+    logsTbody.appendChild(tr);
   });
 
-  // Wire up "Mark Resolved" buttons
-  logsTableBody.querySelectorAll('.resolve-btn').forEach(btn => {
+  // --- Wire up resolve buttons ---
+  logsTbody.querySelectorAll('.resolve-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
       await markIssueResolved(btn.getAttribute('data-uid'), btn.getAttribute('data-time'));
     });
   });
 }
 
-// --- Mark Issue as Resolved ---
+// --- Mark an issue as resolved (admin action) ---
 async function markIssueResolved(userId, entryTime) {
   const userDocRef = doc(db, "users", userId);
   const userDoc = await getDoc(userDocRef);
@@ -145,14 +138,18 @@ async function markIssueResolved(userId, entryTime) {
   }
 }
 
-// --- Format Date ---
+// --- Utility: Format date ---
 function formatDate(isoString) {
   if (!isoString) return "";
   const d = new Date(isoString);
   return d.toLocaleString();
 }
 
-// --- (Optional) Logout Admin ---
-window.adminLogout = function() {
-  signOut(auth).then(() => window.location.href = "../login/login.html");
+// Logout button (id="logout-link")
+const logoutLink = document.getElementById('logout-link');
+if (logoutLink) {
+  logoutLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    signOut(auth).then(() => window.location.href = "../login/login.html");
+  });
 }
