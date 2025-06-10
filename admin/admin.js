@@ -18,9 +18,9 @@ const ADMIN_EMAILS = [
   "oluokundavid4@gmail.com", // replace with your real admins
 ];
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// DOM selectors
+const loadingEl = document.getElementById("loading");
+const appContainer = document.querySelector(".app-container");
 
 // Stats selectors (update if you change stat card order)
 const statTotalUsers = document.querySelectorAll('.stat-value')[0];
@@ -32,13 +32,26 @@ const statAdmins = document.querySelectorAll('.stat-value')[3];
 const deviceStatusTbody = document.getElementById('device-status-tbody');
 const logsTbody = document.getElementById('logs-tbody');
 
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
 // --- Auth: Only allow admins ---
 onAuthStateChanged(auth, user => {
   if (!user || !ADMIN_EMAILS.includes(user.email)) {
-    alert("You are not authorized.");
-    window.location.href = "../login/login.html";
+    // Hide dashboard, show loading, redirect after brief delay (for smoother UX)
+    if (appContainer) appContainer.style.display = "none";
+    if (loadingEl) loadingEl.style.display = "block";
+    setTimeout(() => {
+      alert("You are not authorized.");
+      window.location.href = "../login/login.html";
+    }, 100);
     return;
   }
+  // Authenticated and is admin
+  if (loadingEl) loadingEl.style.display = "none";
+  if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
 });
 
@@ -149,6 +162,6 @@ const logoutLink = document.getElementById('logout-link');
 if (logoutLink) {
   logoutLink.addEventListener('click', function (e) {
     e.preventDefault();
-    signOut(auth).then(() => window.location.href = "../login/login.html");
+    signOut(auth).then(() => window.location.href = "../login/login.html?logout=1");
   });
 }
