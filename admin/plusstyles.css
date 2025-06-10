@@ -229,6 +229,9 @@ th {
   background: rgba(63, 81, 181, 0.04);
   letter-spacing: 0.5px;
 }
+#issue-id {
+  width: 50px;
+}
 tr:not(:last-child) td {
   border-bottom: 1px solid var(--border);
 }
@@ -284,29 +287,6 @@ tr:not(:last-child) td {
   cursor: not-allowed;
 }
 
-/* === Remote Tools Buttons === */
-.remote-tools {
-  display: flex;
-  gap: 0.3em;
-}
-.remote-tools button {
-  background: var(--bg);
-  color: var(--primary-dark);
-  border: none;
-  border-radius: 6px;
-  padding: 0.28em 0.5em;
-  font-size: 1.2em;
-  cursor: pointer;
-  transition: background var(--transition), color var(--transition);
-}
-.remote-tools button:hover:not(:disabled) {
-  background: var(--primary);
-  color: #fff;
-}
-.remote-tools button:disabled {
-  color: #b0b3c4;
-  cursor: not-allowed;
-}
 
 /* === Alert Center === */
 .alert-list {
