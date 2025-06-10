@@ -17,7 +17,7 @@ const firebaseConfig = {
 };
 
 const ADMIN_EMAILS = [
-  "admin1@email.com",  // replace with your real admins
+  "oluokundavid4@gmail.com",  // replace with your real admins
   "admin2@email.com"
 ];
 
