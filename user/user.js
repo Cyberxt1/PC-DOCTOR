@@ -1,11 +1,9 @@
-// user.js for TechFix User Dashboard (UPDATED)
+// TechFix User Dashboard (REWRITTEN)
 // Requires: Firebase Authentication and Firestore
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
-  getAuth,
-  onAuthStateChanged,
-  signOut
+  getAuth, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import {
   getFirestore,
@@ -65,34 +63,39 @@ let alertUnsub = null;
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
-    await updateLastOnline();
-    if (loading) loading.style.display = "none";
-    if (dashboard) dashboard.classList.remove("hidden");
-    userDisplay.textContent = user.displayName || user.email || "User";
-    // Save/update user profile to Firestore
-    const userDocRef = doc(db, "users", user.uid);
-    const userSnapshot = await getDoc(userDocRef);
-    if (!userSnapshot.exists()) {
-      await setDoc(userDocRef, {
-        uid: user.uid,
-        displayName: user.displayName || "",
-        email: user.email || "",
-        photoURL: user.photoURL || "",
-        history: [],
-        lastOnline: new Date().toISOString()
-      });
-    } else {
-      await updateDoc(userDocRef, {
-        displayName: user.displayName || "",
-        email: user.email || "",
-        photoURL: user.photoURL || "",
-        lastOnline: new Date().toISOString()
-      });
+    try {
+      await updateLastOnline();
+      if (loading) loading.style.display = "none";
+      if (dashboard) dashboard.classList.remove("hidden");
+      userDisplay.textContent = user.displayName || user.email || "User";
+      // Save/update user profile to Firestore
+      const userDocRef = doc(db, "users", user.uid);
+      const userSnapshot = await getDoc(userDocRef);
+      if (!userSnapshot.exists()) {
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          displayName: user.displayName || "",
+          email: user.email || "",
+          photoURL: user.photoURL || "",
+          history: [],
+          lastOnline: new Date().toISOString()
+        });
+      } else {
+        await updateDoc(userDocRef, {
+          displayName: user.displayName || "",
+          email: user.email || "",
+          photoURL: user.photoURL || "",
+          lastOnline: new Date().toISOString()
+        });
+      }
+      listenToHistory();
+      listenToAlerts();
+      window.addEventListener("beforeunload", updateLastOnline);
+      setInterval(updateLastOnline, 60000);
+    } catch (err) {
+      alert("Error loading dashboard: " + err.message);
+      if (loading) loading.textContent = "Error: " + err.message;
     }
-    listenToHistory();
-    listenToAlerts();
-    window.addEventListener("beforeunload", updateLastOnline);
-    setInterval(updateLastOnline, 60000); // keep lastOnline fresh
   } else {
     window.location.href = "../login/login.html";
   }
@@ -160,7 +163,6 @@ issueForm?.addEventListener('submit', async function(e) {
     window.location.href = "../login/login.html";
     return;
   }
-  // Gather info
   const desc = document.getElementById('issue-desc').value.trim();
   const devType = deviceType.value;
   let details = '';
@@ -187,7 +189,6 @@ issueForm?.addEventListener('submit', async function(e) {
     formMsg.style.color = '#f44';
     return;
   }
-  // Add to Firestore history
   const entry = {
     time: new Date().toISOString(),
     device: devType,
@@ -232,7 +233,13 @@ function listenToHistory() {
     if (data && data.history && data.history.length) {
       [...data.history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(entry => {
         const li = document.createElement('li');
-        li.textContent = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}]`;
+        let resolvedHTML = '';
+        if (entry.resolved) {
+          resolvedHTML = `<span style="color:#23a13a;font-weight:bold;margin-left:0.6em;"><svg width="18" height="18" style="vertical-align:middle;" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Resolved</span>`;
+        } else {
+          resolvedHTML = `<span style="color:#fa4d56;font-weight:bold;margin-left:0.6em;">Unresolved</span>`;
+        }
+        li.innerHTML = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}] ${resolvedHTML}`;
         historyList.appendChild(li);
       });
     } else {
@@ -244,7 +251,6 @@ function listenToHistory() {
 // --- Live Alerts: Show Chat if In-Progress, Handle Resolved State ---
 function listenToAlerts() {
   if (!currentUser) return;
-  // Listen for in-progress OR resolved alerts for this user
   if (alertUnsub) alertUnsub();
   const alertsQuery = query(
     collection(db, "alerts"),
@@ -256,7 +262,6 @@ function listenToAlerts() {
     let resolvedAlert = null;
     snapshot.forEach(docSnap => {
       const alert = docSnap.data();
-      // Prefer "in-progress", otherwise "resolved"
       if (alert.status === "in-progress" && !active) {
         currentAlertId = docSnap.id;
         showChatBox();
@@ -278,7 +283,6 @@ function listenToAlerts() {
 function showChatBox(isResolved = false, userConfirmed = false) {
   chatSection.style.display = "block";
   if (chatUnsub) chatUnsub();
-  // Listen to chat messages
   const messagesCol = collection(db, "chats", currentUser.uid, "messages");
   chatUnsub = onSnapshot(messagesCol, (snapshot) => {
     chatMessages.innerHTML = '';
@@ -286,22 +290,13 @@ function showChatBox(isResolved = false, userConfirmed = false) {
       .sort((a, b) => a.data().timestamp - b.data().timestamp)
       .forEach(docSnap => {
         const msg = docSnap.data();
+        const isUser = msg.from === "user";
         const msgDiv = document.createElement('div');
         msgDiv.style.display = 'flex';
-        msgDiv.style.justifyContent = msg.from === "user" ? "flex-end" : "flex-start";
+        msgDiv.style.justifyContent = isUser ? "flex-end" : "flex-start";
         msgDiv.style.margin = "5px 0";
         msgDiv.innerHTML = `
-          <span style="
-            display: inline-block;
-            padding: 7px 12px;
-            border-radius: 16px;
-            background: ${msg.from === "user" ? "#aee1f9" : "#eeeeee"};
-            color: #222;
-            font-size: 0.96em;
-            max-width: 70%;
-            word-break: break-word;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-          ">
+          <span class="chat-message ${isUser ? "user" : "admin"}">
             ${msg.text}
           </span>
         `;
@@ -357,5 +352,3 @@ chatForm?.addEventListener('submit', async function(e) {
   await addDoc(collection(db, "chats", currentUser.uid, "messages"), msg);
   chatInput.value = "";
 });
-
-
