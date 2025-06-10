@@ -207,8 +207,12 @@ body {
   width: 100%;
 }
 
+.troubleshooting-logs, .technician-management {
+  overflow-y: scroll;
+}
+
 table {
-  width: 100%;
+  width: fit-content;
   min-width: 550px;
   border-collapse: collapse;
   font-size: 1rem;
@@ -234,6 +238,11 @@ th {
 }
 tr:not(:last-child) td {
   border-bottom: 1px solid var(--border);
+}
+
+
+.dashgrid-2 {
+  height: ;
 }
 
 @media (max-width: 650px) {
