@@ -189,3 +189,39 @@ function listenToHistory() {
     }
   });
 }
+
+
+const chatMessages = document.getElementById("chat-messages");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+
+function listenToChat() {
+  if (!currentUser) return;
+  const messagesCol = collection(db, "chats", currentUser.uid, "messages");
+  onSnapshot(messagesCol, (snapshot) => {
+    chatMessages.innerHTML = '';
+    snapshot.docs.sort((a, b) => a.data().timestamp - b.data().timestamp).forEach(docSnap => {
+      const msg = docSnap.data();
+      const div = document.createElement('div');
+      div.textContent = `${msg.from === "user" ? "You" : "Admin"}: ${msg.text}`;
+      chatMessages.appendChild(div);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+
+chatForm?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const text = chatInput.value.trim();
+  if (!text) return;
+  const msg = {
+    text,
+    from: "user",
+    timestamp: Date.now()
+  };
+  await addDoc(collection(db, "chats", currentUser.uid, "messages"), msg);
+  chatInput.value = "";
+});
+
+// After onAuthStateChanged success, call listenToChat();

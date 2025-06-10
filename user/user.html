@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>User Dashboard</title>
-  <link rel="stylesheet" href="user.css"/>
+  <link rel="stylesheet" href="user.css" />
   <style>
     #loading {
       text-align: center;
@@ -12,14 +13,25 @@
       font-size: 1.3em;
       display: block;
     }
+
     #dashboard.hidden {
       display: none;
     }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .tab-btn.active { background: #e2e2e2; }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tab-btn.active {
+      background: #e2e2e2;
+    }
   </style>
 </head>
+
 <body>
   <div id="loading">Loading...</div>
   <div id="dashboard" class="hidden">
@@ -64,8 +76,18 @@
           <div id="form-msg"></div>
         </form>
       </section>
+
+      <section id="chat" class="tab-content">
+        <h2>Live Support Chat</h2>
+        <div id="chat-messages" style="max-height:300px;overflow-y:auto;"></div>
+        <form id="chat-form">
+          <input type="text" id="chat-input" placeholder="Type message..." autocomplete="off" required />
+          <button type="submit">Send</button>
+        </form>
+      </section>
     </main>
   </div>
   <script type="module" src="user.js"></script>
 </body>
+
 </html>

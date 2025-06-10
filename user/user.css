@@ -124,6 +124,89 @@ header {
 #issue-desc {
   height: 120px;
 }
+
+/* ... your existing styles ... */
+
+/* Chat styles */
+#chat {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 1.2em 1em;
+  max-width: 420px;
+  margin: 2em auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+#chat-messages {
+  background: #fff;
+  border: 1px solid #ddd;
+  min-height: 120px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.7em;
+  margin-bottom: 1em;
+  font-size: 1em;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.chat-message {
+  margin: 0.3em 0;
+  padding: 0.6em 0.9em;
+  border-radius: 20px;
+  display: inline-block;
+  max-width: 90%;
+  clear: both;
+  font-size: 1em;
+  word-break: break-word;
+}
+.chat-message.user {
+  background: #d3e6fd;
+  color: #1a3557;
+  margin-left: auto;
+  float: right;
+}
+.chat-message.admin {
+  background: #eaeaea;
+  color: #2b2b2b;
+  margin-right: auto;
+  float: left;
+}
+
+#chat-form {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+}
+
+#chat-input {
+  flex: 1;
+  border-radius: 18px;
+  border: 1px solid #bbb;
+  padding: 0.6em 1em;
+  font-size: 1em;
+  outline: none;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+#chat-input:focus {
+  border-color: #479cf7;
+}
+
+#chat-form button {
+  background: #479cf7;
+  color: #fff;
+  border: none;
+  border-radius: 18px;
+  padding: 0.6em 1.3em;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#chat-form button:hover {
+  background: #3578c6;
+}
+
 @media (max-width: 700px) {
 
   
