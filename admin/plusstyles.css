@@ -208,6 +208,7 @@ body {
 }
 
 .troubleshooting-logs, .technician-management {
+  height: 50vh;
   overflow-y: scroll;
 }
 
