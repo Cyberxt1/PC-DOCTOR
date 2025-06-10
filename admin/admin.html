@@ -209,13 +209,15 @@
 
       <div class="dashboard-grid grid-2">
         <!-- Alert Center (static for now) -->
+        <!-- Only Alert Center and Chat updated portion -->
+        ...
         <section class="card alert-center">
           <div class="card-header">
             <h2>New Alerts</h2>
           </div>
           <ul class="alert-list"></ul>
         </section>
-        <!-- Chat / Support Interface (static for now) -->
+        <!-- Chat / Support Interface (dynamic for admin) -->
         <section class="card chat-support">
           <div class="card-header">
             <h2>Live Support</h2>
@@ -223,10 +225,10 @@
           </div>
           <div class="chat-window"></div>
           <div class="chat-input">
-            <input type="text" id="input-chat-msg" placeholder="Type your message..." />
-            <button>Send</button>
+            <input type="text" id="input-chat-msg" placeholder="Type your message..." disabled />
           </div>
         </section>
+        ...
       </div>
     </main>
   </div>

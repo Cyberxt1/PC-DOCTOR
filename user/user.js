@@ -1,9 +1,25 @@
-// user.js for TechFix User Dashboard
+// user.js for TechFix User Dashboard (UPDATED)
 // Requires: Firebase Authentication and Firestore
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  onSnapshot,
+  addDoc,
+  collection,
+  query,
+  where
+} from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // --- Firebase config ---
 const firebaseConfig = {
@@ -33,13 +49,23 @@ const issueForm = document.getElementById("issue-form");
 const formMsg = document.getElementById("form-msg");
 const historyList = document.getElementById("history-list");
 
+// Chat
+const chatSection = document.getElementById("chat");
+const chatMessages = document.getElementById("chat-messages");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+
 // --- State ---
 let currentUser = null;
+let currentAlertId = null;
+let chatUnsub = null;
+let alertUnsub = null;
 
 // --- Auth State Check & User Data Sync ---
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
+    await updateLastOnline();
     if (loading) loading.style.display = "none";
     if (dashboard) dashboard.classList.remove("hidden");
     userDisplay.textContent = user.displayName || user.email || "User";
@@ -52,22 +78,36 @@ onAuthStateChanged(auth, async (user) => {
         displayName: user.displayName || "",
         email: user.email || "",
         photoURL: user.photoURL || "",
-        history: []
+        history: [],
+        lastOnline: new Date().toISOString()
       });
     } else {
-      // Optionally update profile info every login
       await updateDoc(userDocRef, {
         displayName: user.displayName || "",
         email: user.email || "",
-        photoURL: user.photoURL || ""
+        photoURL: user.photoURL || "",
+        lastOnline: new Date().toISOString()
       });
     }
     listenToHistory();
+    listenToAlerts();
+    window.addEventListener("beforeunload", updateLastOnline);
+    setInterval(updateLastOnline, 60000); // keep lastOnline fresh
   } else {
-    // Not logged in
     window.location.href = "../login/login.html";
   }
 });
+
+async function updateLastOnline() {
+  if (!currentUser) return;
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      lastOnline: new Date().toISOString()
+    });
+  } catch (err) {
+    // ignore
+  }
+}
 
 // --- Logout ---
 logoutBtn?.addEventListener("click", () => {
@@ -113,7 +153,7 @@ deviceType?.addEventListener('change', function() {
   deviceDetails.innerHTML = html;
 });
 
-// --- Issue Form Submission ---
+// --- Issue Form Submission (+ Creates Alert) ---
 issueForm?.addEventListener('submit', async function(e) {
   e.preventDefault();
   if (!currentUser) {
@@ -152,12 +192,24 @@ issueForm?.addEventListener('submit', async function(e) {
     time: new Date().toISOString(),
     device: devType,
     desc,
-    details
+    details,
+    resolved: false
   };
   try {
     const userDocRef = doc(db, "users", currentUser.uid);
     await updateDoc(userDocRef, {
       history: arrayUnion(entry)
+    });
+    // Add alert for admin
+    await addDoc(collection(db, "alerts"), {
+      uid: currentUser.uid,
+      email: currentUser.email,
+      desc,
+      details,
+      device: devType,
+      time: entry.time,
+      status: "new",
+      userConfirmed: false
     });
     formMsg.textContent = 'Issue submitted! Our admin will review it shortly.';
     formMsg.style.color = '#3a5f3a';
@@ -178,7 +230,6 @@ function listenToHistory() {
     const data = docSnap.data();
     historyList.innerHTML = '';
     if (data && data.history && data.history.length) {
-      // Sort by most recent
       [...data.history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(entry => {
         const li = document.createElement('li');
         li.textContent = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}]`;
@@ -190,29 +241,112 @@ function listenToHistory() {
   });
 }
 
-
-const chatMessages = document.getElementById("chat-messages");
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-
-function listenToChat() {
+// --- Live Alerts: Show Chat if In-Progress, Handle Resolved State ---
+function listenToAlerts() {
   if (!currentUser) return;
-  const messagesCol = collection(db, "chats", currentUser.uid, "messages");
-  onSnapshot(messagesCol, (snapshot) => {
-    chatMessages.innerHTML = '';
-    snapshot.docs.sort((a, b) => a.data().timestamp - b.data().timestamp).forEach(docSnap => {
-      const msg = docSnap.data();
-      const div = document.createElement('div');
-      div.textContent = `${msg.from === "user" ? "You" : "Admin"}: ${msg.text}`;
-      chatMessages.appendChild(div);
+  // Listen for in-progress OR resolved alerts for this user
+  if (alertUnsub) alertUnsub();
+  const alertsQuery = query(
+    collection(db, "alerts"),
+    where("uid", "==", currentUser.uid),
+    where("status", "in", ["in-progress", "resolved"])
+  );
+  alertUnsub = onSnapshot(alertsQuery, snapshot => {
+    let active = false;
+    let resolvedAlert = null;
+    snapshot.forEach(docSnap => {
+      const alert = docSnap.data();
+      // Prefer "in-progress", otherwise "resolved"
+      if (alert.status === "in-progress" && !active) {
+        currentAlertId = docSnap.id;
+        showChatBox();
+        active = true;
+      } else if (alert.status === "resolved" && !active) {
+        currentAlertId = docSnap.id;
+        showChatBox(true, alert.userConfirmed);
+        resolvedAlert = alert;
+        active = true;
+      }
     });
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (!active) {
+      hideChatBox();
+      currentAlertId = null;
+    }
   });
 }
 
+function showChatBox(isResolved = false, userConfirmed = false) {
+  chatSection.style.display = "block";
+  if (chatUnsub) chatUnsub();
+  // Listen to chat messages
+  const messagesCol = collection(db, "chats", currentUser.uid, "messages");
+  chatUnsub = onSnapshot(messagesCol, (snapshot) => {
+    chatMessages.innerHTML = '';
+    snapshot.docs
+      .sort((a, b) => a.data().timestamp - b.data().timestamp)
+      .forEach(docSnap => {
+        const msg = docSnap.data();
+        const msgDiv = document.createElement('div');
+        msgDiv.style.display = 'flex';
+        msgDiv.style.justifyContent = msg.from === "user" ? "flex-end" : "flex-start";
+        msgDiv.style.margin = "5px 0";
+        msgDiv.innerHTML = `
+          <span style="
+            display: inline-block;
+            padding: 7px 12px;
+            border-radius: 16px;
+            background: ${msg.from === "user" ? "#aee1f9" : "#eeeeee"};
+            color: #222;
+            font-size: 0.96em;
+            max-width: 70%;
+            word-break: break-word;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+          ">
+            ${msg.text}
+          </span>
+        `;
+        chatMessages.appendChild(msgDiv);
+      });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+  // Show mark as resolved button if admin resolved and not yet confirmed
+  let btn = document.getElementById("user-resolve-btn");
+  if (isResolved && !userConfirmed) {
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = "user-resolve-btn";
+      btn.textContent = "Mark as Resolved";
+      btn.style.display = "block";
+      btn.style.margin = "15px auto";
+      btn.style.padding = "8px 18px";
+      btn.style.background = "#2da654";
+      btn.style.color = "#fff";
+      btn.style.border = "none";
+      btn.style.borderRadius = "7px";
+      btn.style.cursor = "pointer";
+      btn.onclick = async () => {
+        if (!currentAlertId) return;
+        await updateDoc(doc(db, "alerts", currentAlertId), { userConfirmed: true });
+        btn.remove();
+      };
+      chatSection.appendChild(btn);
+    }
+  } else if (btn) {
+    btn.remove();
+  }
+}
+
+function hideChatBox() {
+  chatSection.style.display = "none";
+  if (chatUnsub) chatUnsub();
+  let btn = document.getElementById("user-resolve-btn");
+  if (btn) btn.remove();
+}
+
+// --- Chat Send ---
 chatForm?.addEventListener('submit', async function(e) {
   e.preventDefault();
-  if (!currentUser) return;
+  if (!currentUser || !currentAlertId) return;
   const text = chatInput.value.trim();
   if (!text) return;
   const msg = {
@@ -223,5 +357,3 @@ chatForm?.addEventListener('submit', async function(e) {
   await addDoc(collection(db, "chats", currentUser.uid, "messages"), msg);
   chatInput.value = "";
 });
-
-// After onAuthStateChanged success, call listenToChat();
