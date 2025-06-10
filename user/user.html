@@ -5,15 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>User Dashboard</title>
   <link rel="stylesheet" href="user.css"/>
+  <style>
+    #loading {
+      text-align: center;
+      margin-top: 4em;
+      font-size: 1.3em;
+      display: block;
+    }
+    #dashboard.hidden {
+      display: none;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .tab-btn.active { background: #e2e2e2; }
+  </style>
 </head>
 <body>
-  <!-- <div id="login-screen" class="centered">
-    <div class="login-box">
-      <h2>Login</h2>
-      <input type="text" id="username" placeholder="Enter your username" />
-      <button id="login-btn">Login</button>
-    </div>
-  </div> -->
+  <div id="loading">Loading...</div>
   <div id="dashboard" class="hidden">
     <header>
       <h1>Welcome, <span id="user-display"></span></h1>
@@ -41,99 +49,23 @@
       </section>
       <section id="askai" class="tab-content">
         <h2>Describe Your Problem</h2>
-        <form id="issue-form">
+        <form id="issue-form" autocomplete="off">
           <label for="device-type">Device Type</label>
           <select id="device-type" required>
             <option value="">Select device type</option>
             <option value="phone">Phone</option>
             <option value="laptop">Laptop</option>
             <option value="other">Other</option>
-      </select>
-    `;
-  } else if (v === 'laptop') {
-    html = `
-      <label for="laptop-processor">Processor Info</label>
-      <input id="laptop-processor" type="text" placeholder="e.g. Intel i5 11th Gen" required>
-      <label for="laptop-os">Operating System Version</label>
-      <input id="laptop-os" type="text" placeholder="e.g. Windows 11 Pro" required>
-    `;
-  }
-  deviceDetails.innerHTML = html;
-});
-
-// --- Issue Form Submission ---
-issueForm?.addEventListener('submit', async function(e) {
-  e.preventDefault();
-  if (!currentUser) {
-    window.location.href = "../login/login.html";
-    return;
-  }
-  // Gather info
-  const desc = document.getElementById('issue-desc').value.trim();
-  const devType = deviceType.value;
-  let details = '';
-  if (devType === 'phone') {
-    const model = document.getElementById('phone-model')?.value || '';
-    if (!model) {
-      formMsg.textContent = 'Please select your phone model.';
-      formMsg.style.color = '#f44';
-      return;
-    }
-    details = `Phone Model: ${model}`;
-  } else if (devType === 'laptop') {
-    const proc = document.getElementById('laptop-processor')?.value || '';
-    const os = document.getElementById('laptop-os')?.value || '';
-    if (!proc || !os) {
-      formMsg.textContent = 'Please fill in all laptop details.';
-      formMsg.style.color = '#f44';
-      return;
-    }
-    details = `Processor: ${proc}, OS: ${os}`;
-  }
-  if (!desc || !devType) {
-    formMsg.textContent = 'Please fill in all required fields.';
-    formMsg.style.color = '#f44';
-    return;
-  }
-  // Add to Firestore history
-  const entry = {
-    time: new Date().toISOString(),
-    device: devType,
-    desc,
-    details
-  };
-  try {
-    const userDocRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userDocRef, {
-      history: arrayUnion(entry)
-    });
-    formMsg.textContent = 'Issue submitted! Our admin will review it shortly.';
-    formMsg.style.color = '#3a5f3a';
-    issueForm.reset();
-    deviceDetails.innerHTML = '';
-    setTimeout(() => formMsg.textContent = '', 3500);
-  } catch (err) {
-    formMsg.textContent = 'Error submitting issue: ' + err.message;
-    formMsg.style.color = '#f44';
-  }
-});
-
-// --- History List from Firestore ---
-function listenToHistory() {
-  if (!currentUser) return;
-  const userDocRef = doc(db, "users", currentUser.uid);
-  onSnapshot(userDocRef, (docSnap) => {
-    const data = docSnap.data();
-    historyList.innerHTML = '';
-    if (data && data.history && data.history.length) {
-      // Sort by most recent
-      [...data.history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(entry => {
-        const li = document.createElement('li');
-        li.textContent = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}]`;
-        historyList.appendChild(li);
-      });
-    } else {
-      historyList.innerHTML = '<li>No support history yet.</li>';
-    }
-  });
-}
+          </select>
+          <div id="device-details"></div>
+          <label for="issue-desc">Describe the issue</label>
+          <textarea id="issue-desc" required placeholder="Describe the problem..."></textarea>
+          <button type="submit">Submit Issue</button>
+          <div id="form-msg"></div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="user.js"></script>
+</body>
+</html>

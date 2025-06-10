@@ -1,6 +1,5 @@
 // user.js for TechFix User Dashboard
 // Requires: Firebase Authentication and Firestore
-// Ensure your HTML uses: <script src="user.js" type="module"></script>
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
@@ -22,6 +21,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- DOM Elements ---
+const loading = document.getElementById("loading");
 const dashboard = document.getElementById("dashboard");
 const userDisplay = document.getElementById("user-display");
 const logoutBtn = document.getElementById("logout-btn");
@@ -40,9 +40,9 @@ let currentUser = null;
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
-    dashboard.classList.remove("hidden");
+    if (loading) loading.style.display = "none";
+    if (dashboard) dashboard.classList.remove("hidden");
     userDisplay.textContent = user.displayName || user.email || "User";
-
     // Save/update user profile to Firestore
     const userDocRef = doc(db, "users", user.uid);
     const userSnapshot = await getDoc(userDocRef);
@@ -70,7 +70,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // --- Logout ---
-logoutBtn.addEventListener("click", () => {
+logoutBtn?.addEventListener("click", () => {
   signOut(auth)
     .then(() => window.location.href = "../login/login.html")
     .catch((err) => alert("Sign out failed: " + err.message));
