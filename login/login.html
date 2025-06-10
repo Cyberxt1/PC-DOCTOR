@@ -72,7 +72,7 @@
           console.log('User signed in:', user);
 
           // Redirect to home page after login
-          window.location.href = '../user/dashboard.html';
+          window.location.href = '../user/user.html';
         })
         .catch((error) => {
           console.error('Error during sign-in:', error);
@@ -84,7 +84,7 @@
     onAuthStateChanged(auth, (user) => {
       if (user) {
         // User is signed in, redirect to index.html automatically
-        window.location.href = '../user/dashboard.html';
+        window.location.href = '../user/user.html';
       }
     });
   </script>
