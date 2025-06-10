@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Dashboard</title>
+  <link rel="stylesheet" href="user.css"/>
+</head>
+<body>
+  <!-- <div id="login-screen" class="centered">
+    <div class="login-box">
+      <h2>Login</h2>
+      <input type="text" id="username" placeholder="Enter your username" />
+      <button id="login-btn">Login</button>
+    </div>
+  </div> -->
+  <div id="dashboard" class="hidden">
+    <header>
+      <h1>Welcome, <span id="user-display"></span></h1>
+      <button id="logout-btn">Logout</button>
+    </header>
+    <nav>
+      <button class="tab-btn active" data-tab="history">History</button>
+      <button class="tab-btn" data-tab="troubleshoot">Troubleshoot</button>
+      <button class="tab-btn" data-tab="askai">Ask AI / Submit Issue</button>
+    </nav>
+    <main>
+      <section id="history" class="tab-content active">
+        <h2>Your Support History</h2>
+        <ul id="history-list"></ul>
+      </section>
+      <section id="troubleshoot" class="tab-content">
+        <h2>Troubleshooting Guide</h2>
+        <p>Try these common fixes:</p>
+        <ol>
+          <li>Restart your device</li>
+          <li>Check your internet connection</li>
+          <li>Update your software</li>
+          <li>If still stuck, ask for help below!</li>
+        </ol>
+      </section>
+      <section id="askai" class="tab-content">
+        <h2>Describe Your Problem</h2>
+        <form id="issue-form">
+          <label for="device-type">Device Type</label>
+          <select id="device-type" required>
+            <option value="">Select device type</option>
+            <option value="phone">Phone</option>
+            <option value="laptop">Laptop</option>
+            <option value="other">Other</option>
+          </select>
+          <div id="device-details"></div>
+          <label for="issue-desc">Problem Description</label>
+          <textarea id="issue-desc" placeholder="Describe your device problem..." required></textarea>
+          <button type="submit">Submit to Admin</button>
+        </form>
+        <div id="form-msg"></div>
+      </section>
+    </main>
+  </div>
+  <script src="user.js"></script>
+</body>
+</html>

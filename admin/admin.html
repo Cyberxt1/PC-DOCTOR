@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="./admin.css">
+  <link rel="stylesheet" href="./plusstyles.css">
+</head>
+
+<body>
+  <header>
+    <nav class="navbar">
+      <div class="navbar-container">
+        <a href="#" class="logo">TechFix</a>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="#">Home</a></li>
+          <li><a href="#">New Gigs</a></li>
+          <li><a href="#">History</a></li>
+          <li><a href="#">Settings</a></li>
+        </ul>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+
+   <div class="app-container">
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Gridddddddddddddddddddddddddddddddddddddddddddddddd -->
+      <div class="dashboard-grid">
+        <!-- User Overview Panel -->
+        <section class="card user-overview">
+          <div class="card-header">
+            <h2>User Overview</h2>
+            <div class="filters">
+              <input type="search" placeholder="Search users..." class="first-input"/>
+              <select>
+                <option>All Subs</option>
+                <option>Free</option>
+                <option>Premium</option>
+                <option>Enterprise</option>
+              </select>
+            </div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-label">Total Users</div>
+              <div class="stat-value">2,450</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Active Sessions</div>
+              <div class="stat-value">312</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Flagged Users</div>
+              <div class="stat-value stat-flagged">5</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Admins</div>
+              <div class="stat-value">1</div>
+            </div>
+          </div>
+        </section>
+        <!-- Device Status Table -->
+        <section class="card device-status">
+          <div class="card-header">
+            <h2>Device Status</h2>
+            <div class="filters">
+              <input type="search" placeholder="Search devices..." class="first-input"/>
+              <select class="first-input">
+                <option>All Statuses</option>
+                <option>Fixed</option>
+                <option>Pending</option>
+              </select>
+            </div>
+          </div>
+          <div class="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Laptop</th>
+                  <th>Status</th>
+                  <th>Last Check</th>
+                  <th>Owner</th>
+                  <!-- <th>Remote Tools</th> -->
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>HP EliteBook 840</td>
+                  <td><span class="badge healthy">Fixed</span></td>
+                  <td>2025-06-07 11:54</td>
+                  <td>user1@gmail.com</td>
+                </tr>
+                <tr>
+                  <td>Dell XPS 13</td>
+                  <td><span class="badge issues">Pending</span></td>
+                  <td>2025-06-07 10:41</td>
+                  <td>user2@gmail.com</td>
+                  
+                </tr>
+                <tr>
+                  <td>Lenovo ThinkPad X1</td>
+                  <td><span class="badge issues">Pending</span></td>
+                  <td>2025-06-06 23:22</td>
+                  <td>user3@gmail.com</td>
+                 
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+
+      <div class="dashboard-grid">
+        
+      <!-- Troubleshooting Logs -->
+      <section class="card troubleshooting-logs">
+        <div class="card-header">
+          <h2>Logs</h2>
+          <div class="filters">
+            <input type="search" placeholder="User or Device..." class="first-input"/>
+            <input type="date" class="date-input"/>
+            <select class="first-input">
+              <option>All Issues</option>
+              <option>Hardware</option>
+              <option>Software</option>
+              <option>Network</option>
+            </select>
+            <button class="export-btn">Export</button>
+          </div>
+        </div>
+        <div class="responsive-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Owner</th>
+                <th>Device</th>
+                <th>Issue Type</th>
+                <th>Fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2025-06-07 09:15</td>
+                <td>lucy.w</td>
+                <td>Dell XPS 13</td>
+                <td>Software</td>
+                <td>Remote scan, cleanup, update</td>
+              </tr>
+              <tr>
+                <td>2025-06-06 18:03</td>
+                <td>tom.b</td>
+                <td>HP EliteBook 840</td>
+                <td>Hardware</td>
+                <td>Fan check, temperature resolved</td>
+              </tr>
+              <tr>
+                <td>2025-06-06 11:45</td>
+                <td>alex.p</td>
+                <td>Lenovo ThinkPad X1</td>
+                <td>Network</td>
+                <td>Driver update, connection reset</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+       <!-- Technician Management -->
+      <section class="card technician-management">
+        <div class="card-header">
+          <h2>Technician Management</h2>
+          <div class="filters">
+            <select>
+              <option>All Technicians</option>
+              <option>Available</option>
+              <option>Busy</option>
+            </select>
+          </div>
+        </div>
+        <div class="responsive-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Assigned Tickets</th>
+                <th>Workload</th>
+                <th>Performance</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Jane Doe</td>
+                <td>6</td>
+                <td>
+                  <div class="workload-bar"><div style="width:60%"></div></div>
+                </td>
+                <td>98%</td>
+                <td><button class="badge reassign">Reassign</button></td>
+              </tr>
+              <tr>
+                <td>Mark Smith</td>
+                <td>9</td>
+                <td>
+                  <div class="workload-bar"><div style="width:90%"></div></div>
+                </td>
+                <td>91%</td>
+                <td><button class="badge reassign">Reassign</button></td>
+              </tr>
+              <tr>
+                <td>Alex Johnson</td>
+                <td>2</td>
+                <td>
+                  <div class="workload-bar"><div style="width:20%"></div></div>
+                </td>
+                <td>100%</td>
+                <td><button class="badge reassign">Reassign</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      </div>
+
+      <!-- Griddddddddddddddddddddddddddddddddddddddddddddddddddddddddd -->
+      <div class="dashboard-grid grid-2">
+        <!-- Alert Center -->
+        <section class="card alert-center">
+          <div class="card-header">
+            <h2>New Alerts</h2>
+          </div>
+          <ul class="alert-list">
+            <li class="alert alert-overheating">
+              <span class="alert-icon"> <span>My laptop is overheating</span></span>
+              
+              <button class="badge resolve">Respond</button>
+            </li>
+            <li class="alert alert-storage">
+              <span class="alert-icon"><span>Storage full on Dell XPS 13</span></span>
+              
+              <button class="badge resolve">Respond</button>
+            </li>
+            <li class="alert alert-failedscan">
+              <span class="alert-icon"><span>Failed scan on Lenovo ThinkPad X1</span></span>
+              
+              <button class="badge resolve">Respond</button>
+            </li>
+          </ul>
+        </section>
+        <!-- Chat / Support Interface -->
+        <section class="card chat-support">
+          <div class="card-header">
+            <h2>Live Support</h2>
+            <span class="chat-status online">Online</span>
+          </div>
+          <div class="chat-window">
+            <div class="chat-message user">
+              <span class="avatar">JD</span>
+              <div class="msg">Hi, I'm having trouble with my laptop overheating.</div>
+            </div>
+            <div class="chat-message support">
+              <span class="avatar">OD</span>
+              <div class="msg">Hello Jane, I see the alert. I'll start a remote scan now.</div>
+            </div>
+            <div class="chat-message user">
+              <span class="avatar">JD</span>
+              <div class="msg">Thank you!</div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input type="text" id="input-chat-msg" placeholder="Type your message..."/>
+            <button>Send</button>
+          </div>
+        </section>
+      </div>
+
+
+     
+    </main>
+  </div>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+    });
+  </script>
+  <script type="module" src="./admin.js"></script>
+</body>
+
+</html>
