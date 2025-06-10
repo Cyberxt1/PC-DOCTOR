@@ -101,6 +101,10 @@
     window.techfixLogout = () => signOut(auth).then(() => {
       window.location.href = "login.html?logout=1";
     });
+
+    if (window.history && window.history.replaceState) {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
   </script>
 </body>
 </html>

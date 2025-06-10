@@ -20,3 +20,4 @@ document.getElementById('login-btn').onclick = () => {
 onAuthStateChanged(auth, user => {
   // Don't auto-redirect! Just show login if not signed in.
 });
+
