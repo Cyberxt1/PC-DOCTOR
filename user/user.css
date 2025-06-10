@@ -264,3 +264,21 @@ header {
     display: flex;
   }
 }
+
+
+/* Add this to the end of your CSS file for the tick and chat classes if not present */
+
+.resolved-tick {
+  color: #23a13a;
+  font-weight: bold;
+  margin-left: 0.6em;
+  vertical-align: middle;
+  font-size: 1.15em;
+}
+.unresolved-tag {
+  color: #fa4d56;
+  font-weight: bold;
+  margin-left: 0.6em;
+  vertical-align: middle;
+  font-size: 1.05em;
+}

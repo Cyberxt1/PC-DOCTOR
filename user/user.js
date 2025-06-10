@@ -357,3 +357,83 @@ chatForm?.addEventListener('submit', async function(e) {
   await addDoc(collection(db, "chats", currentUser.uid, "messages"), msg);
   chatInput.value = "";
 });
+
+
+// ... your existing imports and state code ...
+// --- History List from Firestore ---
+function listenToHistory() {
+  if (!currentUser) return;
+  const userDocRef = doc(db, "users", currentUser.uid);
+  onSnapshot(userDocRef, (docSnap) => {
+    const data = docSnap.data();
+    historyList.innerHTML = '';
+    if (data && data.history && data.history.length) {
+      [...data.history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(entry => {
+        const li = document.createElement('li');
+        let resolvedHTML = '';
+        if (entry.resolved) {
+          resolvedHTML = `<span style="color:#23a13a;font-weight:bold;margin-left:0.6em;"><svg width="18" height="18" style="vertical-align:middle;" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Resolved</span>`;
+        } else {
+          resolvedHTML = `<span style="color:#fa4d56;font-weight:bold;margin-left:0.6em;">Unresolved</span>`;
+        }
+        li.innerHTML = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}] ${resolvedHTML}`;
+        historyList.appendChild(li);
+      });
+    } else {
+      historyList.innerHTML = '<li>No support history yet.</li>';
+    }
+  });
+}
+
+// --- Chat update: use .chat-message classes from CSS for both user/admin messages ---
+function showChatBox(isResolved = false, userConfirmed = false) {
+  chatSection.style.display = "block";
+  if (chatUnsub) chatUnsub();
+  // Listen to chat messages
+  const messagesCol = collection(db, "chats", currentUser.uid, "messages");
+  chatUnsub = onSnapshot(messagesCol, (snapshot) => {
+    chatMessages.innerHTML = '';
+    snapshot.docs
+      .sort((a, b) => a.data().timestamp - b.data().timestamp)
+      .forEach(docSnap => {
+        const msg = docSnap.data();
+        const isUser = msg.from === "user";
+        const msgDiv = document.createElement('div');
+        msgDiv.style.display = 'flex';
+        msgDiv.style.justifyContent = isUser ? "flex-end" : "flex-start";
+        msgDiv.style.margin = "5px 0";
+        msgDiv.innerHTML = `
+          <span class="chat-message ${isUser ? "user" : "admin"}">
+            ${msg.text}
+          </span>
+        `;
+        chatMessages.appendChild(msgDiv);
+      });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+  // Show mark as resolved button if admin resolved and not yet confirmed
+  let btn = document.getElementById("user-resolve-btn");
+  if (isResolved && !userConfirmed) {
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = "user-resolve-btn";
+      btn.textContent = "Mark as Resolved";
+      btn.style.display = "block";
+      btn.style.margin = "15px auto";
+      btn.style.padding = "8px 18px";
+      btn.style.background = "#2da654";
+      btn.style.color = "#fff";
+      btn.style.border = "none";
+      btn.style.borderRadius = "7px";
+      btn.style.cursor = "pointer";
+      btn.onclick = async () => {
+        if (!currentAlertId) return;
+        await updateDoc(doc(db, "alerts", currentAlertId), { userConfirmed: true });
+        btn.remove();
+      };
+      chatSection.appendChild(btn);
+    }
+  } else if (btn) {
+    btn.remove();
+  }
+}
