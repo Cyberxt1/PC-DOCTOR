@@ -246,10 +246,6 @@ tr:not(:last-child) td {
   border-bottom: 1px solid var(--border);
 }
 
-.dashgrid-2 {
-  height: ;
-}
-
 @media (max-width: 650px) {
   table {
     min-width: 400px;
