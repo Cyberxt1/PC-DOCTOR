@@ -1,105 +1,53 @@
-// user.js for TechFix User Dashboard
-// Requires: Firebase Authentication and Firestore
-// Ensure your HTML uses: <script src="user.js" type="module"></script>
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
-
-// --- Firebase config ---
-const firebaseConfig = {
-  apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
-  authDomain: "techfix-ef115.firebaseapp.com",
-  projectId: "techfix-ef115",
-  storageBucket: "techfix-ef115.firebasestorage.app",
-  messagingSenderId: "798114675752",
-  appId: "1:798114675752:web:33450b57585b4a643b891d",
-  measurementId: "G-69MKL5ETH7"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// --- DOM Elements ---
-const dashboard = document.getElementById("dashboard");
-const userDisplay = document.getElementById("user-display");
-const logoutBtn = document.getElementById("logout-btn");
-const tabBtns = document.querySelectorAll(".tab-btn");
-const tabContents = document.querySelectorAll(".tab-content");
-const deviceType = document.getElementById("device-type");
-const deviceDetails = document.getElementById("device-details");
-const issueForm = document.getElementById("issue-form");
-const formMsg = document.getElementById("form-msg");
-const historyList = document.getElementById("history-list");
-
-// --- State ---
-let currentUser = null;
-
-// --- Auth State Check & User Data Sync ---
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUser = user;
-    dashboard.classList.remove("hidden");
-    userDisplay.textContent = user.displayName || user.email || "User";
-
-    // Save/update user profile to Firestore
-    const userDocRef = doc(db, "users", user.uid);
-    const userSnapshot = await getDoc(userDocRef);
-    if (!userSnapshot.exists()) {
-      await setDoc(userDocRef, {
-        uid: user.uid,
-        displayName: user.displayName || "",
-        email: user.email || "",
-        photoURL: user.photoURL || "",
-        history: []
-      });
-    } else {
-      // Optionally update profile info every login
-      await updateDoc(userDocRef, {
-        displayName: user.displayName || "",
-        email: user.email || "",
-        photoURL: user.photoURL || ""
-      });
-    }
-    listenToHistory();
-  } else {
-    // Not logged in
-    window.location.href = "../login/login.html";
-  }
-});
-
-// --- Logout ---
-logoutBtn.addEventListener("click", () => {
-  signOut(auth)
-    .then(() => window.location.href = "../login/login.html")
-    .catch((err) => alert("Sign out failed: " + err.message));
-});
-
-// --- Tabs Logic ---
-tabBtns.forEach(btn => {
-  btn.onclick = function() {
-    tabBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.getAttribute('data-tab');
-    tabContents.forEach(cont => cont.classList.remove('active'));
-    document.getElementById(tab).classList.add('active');
-  };
-});
-
-// --- Dynamic Device Fields ---
-deviceType?.addEventListener('change', function() {
-  const v = deviceType.value;
-  let html = '';
-  if (v === 'phone') {
-    html = `
-      <label for="phone-model">Phone Model</label>
-      <select id="phone-model" required>
-        <option value="">Select model</option>
-        <option>Samsung Galaxy S23</option>
-        <option>iPhone 14</option>
-        <option>Infinix Hot 40</option>
-        <option>Other</option>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Dashboard</title>
+  <link rel="stylesheet" href="user.css"/>
+</head>
+<body>
+  <!-- <div id="login-screen" class="centered">
+    <div class="login-box">
+      <h2>Login</h2>
+      <input type="text" id="username" placeholder="Enter your username" />
+      <button id="login-btn">Login</button>
+    </div>
+  </div> -->
+  <div id="dashboard" class="hidden">
+    <header>
+      <h1>Welcome, <span id="user-display"></span></h1>
+      <button id="logout-btn">Logout</button>
+    </header>
+    <nav>
+      <button class="tab-btn active" data-tab="history">History</button>
+      <button class="tab-btn" data-tab="troubleshoot">Troubleshoot</button>
+      <button class="tab-btn" data-tab="askai">Ask AI / Submit Issue</button>
+    </nav>
+    <main>
+      <section id="history" class="tab-content active">
+        <h2>Your Support History</h2>
+        <ul id="history-list"></ul>
+      </section>
+      <section id="troubleshoot" class="tab-content">
+        <h2>Troubleshooting Guide</h2>
+        <p>Try these common fixes:</p>
+        <ol>
+          <li>Restart your device</li>
+          <li>Check your internet connection</li>
+          <li>Update your software</li>
+          <li>If still stuck, ask for help below!</li>
+        </ol>
+      </section>
+      <section id="askai" class="tab-content">
+        <h2>Describe Your Problem</h2>
+        <form id="issue-form">
+          <label for="device-type">Device Type</label>
+          <select id="device-type" required>
+            <option value="">Select device type</option>
+            <option value="phone">Phone</option>
+            <option value="laptop">Laptop</option>
+            <option value="other">Other</option>
       </select>
     `;
   } else if (v === 'laptop') {
