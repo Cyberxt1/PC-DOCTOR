@@ -286,6 +286,8 @@ function openAdminChat(uid, issue) {
   };
 }
 
+// ...[all your code above remains unchanged up to loadAdminChat]...
+
 function loadAdminChat(uid) {
   if (chatUnsub) chatUnsub();
   const adminChatMessages = document.getElementById("admin-chat-messages");
@@ -303,17 +305,9 @@ function loadAdminChat(uid) {
           msgDiv.style.display = 'flex';
           msgDiv.style.justifyContent = isAdmin ? "flex-end" : "flex-start";
           msgDiv.style.margin = "5px 0";
+          // Use chat-message classes for consistent style
           msgDiv.innerHTML = `
-            <span style="
-              display:inline-block;
-              padding:9px 14px;
-              border-radius:20px;
-              background:${isAdmin ? "#16b978" : "#e2e2e2"};
-              color:${isAdmin ? "#fff" : "#222"};
-              font-size:1.01em;
-              max-width:78%;
-              word-break:break-word;
-              box-shadow:0 1px 2px #0001;">
+            <span class="chat-message ${isAdmin ? "admin" : "user"}">
               ${msg.text}
             </span>
           `;
@@ -324,6 +318,7 @@ function loadAdminChat(uid) {
   );
 }
 
+// ...[rest of your code remains unchanged]...
 async function addAdminChatMsg(uid, text) {
   await addDoc(collection(db, "chats", uid, "messages"), {
     text,

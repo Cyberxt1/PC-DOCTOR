@@ -500,3 +500,16 @@ tr:not(:last-child) td {
   background: var(--border);
   border-radius: 7px;
 }
+
+.chat-message.user {
+  background: #d3e6fd;
+  color: #1a3557;
+  margin-left: auto;
+  float: right;
+}
+.chat-message.admin {
+  background: #16b978;
+  color: #fff;
+  margin-right: auto;
+  float: left;
+}
