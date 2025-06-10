@@ -44,7 +44,7 @@ onAuthStateChanged(auth, user => {
     if (appContainer) appContainer.style.display = "none";
     if (loadingEl) loadingEl.style.display = "block";
     setTimeout(() => {
-      alert("You are not authorized.");
+      // alert("You are not authorized.");
       window.location.href = "../login/login.html";
     }, 100);
     return;
