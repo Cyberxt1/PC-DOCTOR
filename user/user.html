@@ -1,63 +1,191 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>User Dashboard</title>
-  <link rel="stylesheet" href="user.css"/>
-</head>
-<body>
-  <!-- <div id="login-screen" class="centered">
-    <div class="login-box">
-      <h2>Login</h2>
-      <input type="text" id="username" placeholder="Enter your username" />
-      <button id="login-btn">Login</button>
-    </div>
-  </div> -->
-  <div id="dashboard" class="hidden">
-    <header>
-      <h1>Welcome, <span id="user-display"></span></h1>
-      <button id="logout-btn">Logout</button>
-    </header>
-    <nav>
-      <button class="tab-btn active" data-tab="history">History</button>
-      <button class="tab-btn" data-tab="troubleshoot">Troubleshoot</button>
-      <button class="tab-btn" data-tab="askai">Ask AI / Submit Issue</button>
-    </nav>
-    <main>
-      <section id="history" class="tab-content active">
-        <h2>Your Support History</h2>
-        <ul id="history-list"></ul>
-      </section>
-      <section id="troubleshoot" class="tab-content">
-        <h2>Troubleshooting Guide</h2>
-        <p>Try these common fixes:</p>
-        <ol>
-          <li>Restart your device</li>
-          <li>Check your internet connection</li>
-          <li>Update your software</li>
-          <li>If still stuck, ask for help below!</li>
-        </ol>
-      </section>
-      <section id="askai" class="tab-content">
-        <h2>Describe Your Problem</h2>
-        <form id="issue-form">
-          <label for="device-type">Device Type</label>
-          <select id="device-type" required>
-            <option value="">Select device type</option>
-            <option value="phone">Phone</option>
-            <option value="laptop">Laptop</option>
-            <option value="other">Other</option>
-          </select>
-          <div id="device-details"></div>
-          <label for="issue-desc">Problem Description</label>
-          <textarea id="issue-desc" placeholder="Describe your device problem..." required></textarea>
-          <button type="submit">Submit to Admin</button>
-        </form>
-        <div id="form-msg"></div>
-      </section>
-    </main>
-  </div>
-  <script src="user.js"></script>
-</body>
-</html>
+// user.js for TechFix User Dashboard
+// Requires: Firebase Authentication and Firestore
+// Make sure to use: <script src="user.js" type="module"></script>
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+
+// --- Firebase config --- (replace with your latest config if changed)
+const firebaseConfig = {
+  apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
+  authDomain: "techfix-ef115.firebaseapp.com",
+  projectId: "techfix-ef115",
+  storageBucket: "techfix-ef115.firebasestorage.app",
+  messagingSenderId: "798114675752",
+  appId: "1:798114675752:web:33450b57585b4a643b891d",
+  measurementId: "G-69MKL5ETH7"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- DOM Elements ---
+const dashboard = document.getElementById("dashboard");
+const userDisplay = document.getElementById("user-display");
+const logoutBtn = document.getElementById("logout-btn");
+const tabBtns = document.querySelectorAll(".tab-btn");
+const tabContents = document.querySelectorAll(".tab-content");
+const deviceType = document.getElementById("device-type");
+const deviceDetails = document.getElementById("device-details");
+const issueForm = document.getElementById("issue-form");
+const formMsg = document.getElementById("form-msg");
+const historyList = document.getElementById("history-list");
+
+// --- State ---
+let currentUser = null;
+
+// --- Auth State Check & User Data Sync ---
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    dashboard.classList.remove("hidden");
+    userDisplay.textContent = user.displayName || user.email || "User";
+
+    // Save/update user profile to Firestore
+    const userDocRef = doc(db, "users", user.uid);
+    const userSnapshot = await getDoc(userDocRef);
+    if (!userSnapshot.exists()) {
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        displayName: user.displayName || "",
+        email: user.email || "",
+        photoURL: user.photoURL || "",
+        history: []
+      });
+    } else {
+      // Optionally update profile info every login
+      await updateDoc(userDocRef, {
+        displayName: user.displayName || "",
+        email: user.email || "",
+        photoURL: user.photoURL || ""
+      });
+    }
+    listenToHistory();
+  } else {
+    // Not logged in
+    window.location.href = "../login/login.html";
+  }
+});
+
+// --- Logout ---
+logoutBtn.addEventListener("click", () => {
+  signOut(auth)
+    .then(() => window.location.href = "../login/login.html")
+    .catch((err) => alert("Sign out failed: " + err.message));
+});
+
+// --- Tabs Logic ---
+tabBtns.forEach(btn => {
+  btn.onclick = function() {
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.getAttribute('data-tab');
+    tabContents.forEach(cont => cont.classList.remove('active'));
+    document.getElementById(tab).classList.add('active');
+  };
+});
+
+// --- Dynamic Device Fields ---
+deviceType?.addEventListener('change', function() {
+  const v = deviceType.value;
+  let html = '';
+  if (v === 'phone') {
+    html = `
+      <label for="phone-model">Phone Model</label>
+      <select id="phone-model" required>
+        <option value="">Select model</option>
+        <option>Samsung Galaxy S23</option>
+        <option>iPhone 14</option>
+        <option>Infinix Hot 40</option>
+        <option>Other</option>
+      </select>
+    `;
+  } else if (v === 'laptop') {
+    html = `
+      <label for="laptop-processor">Processor Info</label>
+      <input id="laptop-processor" type="text" placeholder="e.g. Intel i5 11th Gen" required>
+      <label for="laptop-os">Operating System Version</label>
+      <input id="laptop-os" type="text" placeholder="e.g. Windows 11 Pro" required>
+    `;
+  }
+  deviceDetails.innerHTML = html;
+});
+
+// --- Issue Form Submission ---
+issueForm?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  if (!currentUser) {
+    window.location.href = "../login/login.html";
+    return;
+  }
+  // Gather info
+  const desc = document.getElementById('issue-desc').value.trim();
+  const devType = deviceType.value;
+  let details = '';
+  if (devType === 'phone') {
+    const model = document.getElementById('phone-model')?.value || '';
+    if (!model) {
+      formMsg.textContent = 'Please select your phone model.';
+      formMsg.style.color = '#f44';
+      return;
+    }
+    details = `Phone Model: ${model}`;
+  } else if (devType === 'laptop') {
+    const proc = document.getElementById('laptop-processor')?.value || '';
+    const os = document.getElementById('laptop-os')?.value || '';
+    if (!proc || !os) {
+      formMsg.textContent = 'Please fill in all laptop details.';
+      formMsg.style.color = '#f44';
+      return;
+    }
+    details = `Processor: ${proc}, OS: ${os}`;
+  }
+  if (!desc || !devType) {
+    formMsg.textContent = 'Please fill in all required fields.';
+    formMsg.style.color = '#f44';
+    return;
+  }
+  // Add to Firestore history
+  const entry = {
+    time: new Date().toISOString(),
+    device: devType,
+    desc,
+    details
+  };
+  try {
+    const userDocRef = doc(db, "users", currentUser.uid);
+    await updateDoc(userDocRef, {
+      history: arrayUnion(entry)
+    });
+    formMsg.textContent = 'Issue submitted! Our admin will review it shortly.';
+    formMsg.style.color = '#3a5f3a';
+    issueForm.reset();
+    deviceDetails.innerHTML = '';
+    setTimeout(() => formMsg.textContent = '', 3500);
+  } catch (err) {
+    formMsg.textContent = 'Error submitting issue: ' + err.message;
+    formMsg.style.color = '#f44';
+  }
+});
+
+// --- History List from Firestore ---
+function listenToHistory() {
+  if (!currentUser) return;
+  const userDocRef = doc(db, "users", currentUser.uid);
+  onSnapshot(userDocRef, (docSnap) => {
+    const data = docSnap.data();
+    historyList.innerHTML = '';
+    if (data && data.history && data.history.length) {
+      // Sort by most recent
+      [...data.history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(entry => {
+        const li = document.createElement('li');
+        li.textContent = `[${(new Date(entry.time)).toLocaleString()}] (${entry.device}) - ${entry.desc} [${entry.details}]`;
+        historyList.appendChild(li);
+      });
+    } else {
+      historyList.innerHTML = '<li>No support history yet.</li>';
+    }
+  });
+}
