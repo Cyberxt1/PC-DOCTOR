@@ -10,9 +10,9 @@
 </head>
 
 <body>
- <header>
-   <!-- Navbar -->
-  <nav class="navbar">
+  <header>
+    <!-- Navbar -->
+    <nav class="navbar">
       <a href="#" class="logo">TechFix</a>
       <ul class="nav-links" id="navLinks">
         <li><a href="../index.html">Home</a></li>
@@ -20,74 +20,87 @@
       <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
         <span></span><span></span><span></span>
       </button>
-  </nav>
+    </nav>
 
-  <div class="login-container">
-    <div class="login-box">
-      <h2>TechFix</h2>
-      <h2>Welcome Back</h2>
-      <button class="google-btn" id="google-login-btn">
-        <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />
-        Sign in with Google
-      </button>
-      <div class="divider">OR</div>
-      <form class="login-form" autocomplete="off">
-        <input type="email" placeholder="email address" disabled />
-        <input type="password" placeholder="Password" disabled />
-        <button type="button" class="disabled-btn" disabled>
-          Sign in with Email (Coming soon)
+    <div class="login-container">
+      <div class="login-box">
+        <h2>TechFix</h2>
+        <h2>Welcome Back</h2>
+        <button class="google-btn" id="google-login-btn">
+          <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />
+          Sign in with Google
         </button>
-      </form>
+        <div class="divider">OR</div>
+        <form class="login-form" autocomplete="off">
+          <input type="email" placeholder="email address" disabled />
+          <input type="password" placeholder="Password" disabled />
+          <button type="button" class="disabled-btn" disabled>
+            Sign in with Email (Coming soon)
+          </button>
+        </form>
+      </div>
     </div>
-  </div>
- </header>
+  </header>
   <!-- Add this before your login.js script -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 
-    // Your Firebase config - make sure this matches your project config exactly
-    const firebaseConfig = {
-      apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
-      authDomain: "techfix-ef115.firebaseapp.com",
-      projectId: "techfix-ef115",
-      storageBucket: "techfix-ef115.firebasestorage.app",
-      messagingSenderId: "798114675752",
-      appId: "1:798114675752:web:33450b57585b4a643b891d",
-      measurementId: "G-69MKL5ETH7"
-    };
+  // Your Firebase config - make sure this matches your project config exactly
+  const firebaseConfig = {
+    apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
+    authDomain: "techfix-ef115.firebaseapp.com",
+    projectId: "techfix-ef115",
+    storageBucket: "techfix-ef115.firebasestorage.app",
+    messagingSenderId: "798114675752",
+    appId: "1:798114675752:web:33450b57585b4a643b891d",
+    measurementId: "G-69MKL5ETH7"
+  };
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+  // List of admin emails - replace with your admin emails
+  const ADMIN_EMAILS = [
+    "oluokundavid4@gmail.com",
+    "admin2@email.com"
+  ];
 
-    // Google login button click handler
-    document.getElementById('google-login-btn').addEventListener('click', () => {
-      signInWithPopup(auth, provider)
-        .then((result) => {
-          // Google Access Token: result.credential.accessToken
-          // Signed-in user info:
-          const user = result.user;
-          console.log('User signed in:', user);
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
 
-          // Redirect to home page after login
+  // Google login button click handler
+  document.getElementById('google-login-btn').addEventListener('click', () => {
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        const user = result.user;
+        console.log('User signed in:', user);
+
+        // Check if user email is in the admin list
+        if (ADMIN_EMAILS.includes(user.email)) {
+          // Redirect admin
+          window.location.href = '../admin/admin.html';
+        } else {
+          // Redirect regular user
           window.location.href = '../user/user.html';
-        })
-        .catch((error) => {
-          console.error('Error during sign-in:', error);
-          alert('Login failed: ' + error.message);
-        });
-    });
+        }
+      })
+      .catch((error) => {
+        console.error('Error during sign-in:', error);
+        alert('Login failed: ' + error.message);
+      });
+  });
 
-    // Optional: Detect if user is already logged in, redirect to home
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        // User is signed in, redirect to index.html automatically
+  // Optional: Detect if user is already logged in, redirect accordingly
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      if (ADMIN_EMAILS.includes(user.email)) {
+        window.location.href = '../admin/admin.html';
+      } else {
         window.location.href = '../user/user.html';
       }
-    });
-  </script>
+    }
+  });
+</script>
 
   <script src="login.js"></script>
 </body>
