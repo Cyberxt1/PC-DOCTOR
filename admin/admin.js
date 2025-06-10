@@ -1,170 +1,158 @@
-import { auth, db } from '../firebase-config/shared-firebase.js';
-import {
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// TechFix Admin Dashboard
+// Place in your admin folder, load with <script type="module" src="./admin.js"></script>
 
-// Routing for admin sidebar
-const navItems = document.querySelectorAll('.nav-item');
-const sections = document.querySelectorAll('.admin-section');
-navItems.forEach(item => {
-  item.addEventListener('click', () => {
-    navItems.forEach(i => i.classList.remove('active'));
-    item.classList.add('active');
-    sections.forEach(sec => sec.classList.remove('active'));
-    document.getElementById(item.dataset.page).classList.add('active');
-  });
-});
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// Toast message
-function showToast(msg) {
-  const toast = document.getElementById('admin-toast');
-  toast.textContent = msg;
-  toast.classList.add('active');
-  setTimeout(() => toast.classList.remove('active'), 2500);
-}
-
-// Auth state: only allow admins
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location.href = "/admin-login.html"; // Redirect to admin login if not logged in
-    return;
-  }
-  // Optionally check for admin in Firestore or custom claims here
-  document.getElementById('admin-user-info').textContent = user.email;
-
-  // Load dashboard data
-  loadDashboard();
-  loadUsers();
-  loadIssues();
-  loadDevices();
-  loadLogs();
-  loadAlerts();
-});
-
-// Logout
-document.getElementById('logout-btn').onclick = async () => {
-  await signOut(auth);
-  window.location.href = "/admin-login.html";
+// --- Firebase config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
+  authDomain: "techfix-ef115.firebaseapp.com",
+  projectId: "techfix-ef115",
+  storageBucket: "techfix-ef115.firebasestorage.app",
+  messagingSenderId: "798114675752",
+  appId: "1:798114675752:web:33450b57585b4a643b891d",
+  measurementId: "G-69MKL5ETH7"
 };
 
-// Dashboard Widgets
-async function loadDashboard() {
-  // User count
-  const usersSnap = await getDocs(collection(db, "users"));
-  document.querySelector("#total-users span").textContent = usersSnap.size;
+const ADMIN_EMAILS = [
+  "admin1@email.com",  // replace with your real admins
+  "admin2@email.com"
+];
 
-  // Issues count
-  const issuesSnap = await getDocs(query(collection(db, "issues"), where("status", "!=", "resolved")));
-  document.querySelector("#open-issues span").textContent = issuesSnap.size;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  // Devices count
-  const devicesSnap = await getDocs(collection(db, "devices"));
-  document.querySelector("#total-devices span").textContent = devicesSnap.size;
-}
+// --- DOM Elements (add these IDs/classes to your HTML if missing) ---
+const statsTotalUsers = document.querySelector('.stat-value'); // 1st .stat-value for total users
+const statsActiveSessions = document.querySelectorAll('.stat-value')[1];
+const statsFlagged = document.querySelectorAll('.stat-value')[2];
+const statsAdmins = document.querySelectorAll('.stat-value')[3];
+const deviceTableBody = document.querySelector('.device-status tbody');
+const logsTableBody = document.querySelector('.troubleshooting-logs tbody');
 
-// Users Table
-function loadUsers() {
-  onSnapshot(collection(db, "users"), (snapshot) => {
-    const tbody = document.getElementById('users-table');
-    tbody.innerHTML = "";
-    snapshot.forEach(doc => {
-      const user = doc.data();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${user.name || ''}</td>
-                      <td>${user.email || ''}</td>
-                      <td>${user.role || 'user'}</td>`;
-      tbody.appendChild(tr);
-    });
-  });
-}
+// --- Auth: Only Allow Admins ---
+onAuthStateChanged(auth, user => {
+  if (!user || !ADMIN_EMAILS.includes(user.email)) {
+    alert("You are not authorized to access this dashboard.");
+    window.location.href = "../login/login.html";
+    return;
+  }
+  // Load users live
+  liveLoadUsers();
+});
 
-// Issues Table
-function loadIssues() {
-  onSnapshot(query(collection(db, "issues"), orderBy("createdAt", "desc")), (snapshot) => {
-    const tbody = document.getElementById('issues-table');
-    tbody.innerHTML = "";
+// --- Live Load All Users and Their Data ---
+function liveLoadUsers() {
+  const usersCol = collection(db, "users");
+  onSnapshot(usersCol, (snapshot) => {
+    const users = [];
     snapshot.forEach(docSnap => {
-      const issue = docSnap.data();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${issue.username || ''}</td>
-        <td>${issue.deviceType || ''}</td>
-        <td>${issue.description || ''}</td>
-        <td>${issue.status || 'open'}</td>
-        <td>
-          <button class="issue-action" data-id="${docSnap.id}" data-status="${issue.status}">
-            ${issue.status === 'resolved' ? 'Reopen' : 'Resolve'}
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
+      users.push({ ...docSnap.data(), id: docSnap.id });
     });
-    // Add actions
-    tbody.querySelectorAll('.issue-action').forEach(btn => {
-      btn.onclick = async () => {
-        const id = btn.dataset.id;
-        const status = btn.dataset.status;
-        const newStatus = status === 'resolved' ? 'open' : 'resolved';
-        await updateDoc(doc(db, "issues", id), { status: newStatus });
-        showToast("Issue status updated");
-      };
+    updateStats(users);
+    updateDeviceTable(users);
+    updateLogsTable(users);
+  });
+}
+
+// --- Update User Stats ---
+function updateStats(users) {
+  statsTotalUsers.textContent = users.length;
+  statsAdmins.textContent = users.filter(u => ADMIN_EMAILS.includes(u.email)).length;
+  statsActiveSessions.textContent = Math.floor(users.length * 0.2 + 1); // fake value; replace with real if you track sessions
+  statsFlagged.textContent = users.filter(u => u.flagged).length;
+}
+
+// --- Device Table: Show Most Recent Device Issue Per User ---
+function updateDeviceTable(users) {
+  deviceTableBody.innerHTML = "";
+  const latestIssues = [];
+  users.forEach(user => {
+    if (Array.isArray(user.history) && user.history.length > 0) {
+      const latest = [...user.history].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
+      latestIssues.push({ ...latest, owner: user.email, uid: user.id });
+    }
+  });
+
+  latestIssues.forEach(entry => {
+    const tr = document.createElement('tr');
+    let deviceLabel = entry.device === 'laptop'
+      ? (entry.details.match(/Processor: (.*?),/) ? entry.details.match(/Processor: (.*?),/)[1] : "Laptop")
+      : (entry.device === 'phone'
+          ? (entry.details.match(/Model: (.*)/) ? entry.details.match(/Model: (.*)/)[1] : "Phone")
+          : "Other");
+
+    const status = entry.resolved ? "Fixed" : "Pending";
+    const badgeClass = entry.resolved ? "healthy" : "issues";
+
+    tr.innerHTML = `
+      <td>${deviceLabel}</td>
+      <td><span class="badge ${badgeClass}">${status}</span></td>
+      <td>${formatDate(entry.time)}</td>
+      <td>${entry.owner}</td>
+    `;
+    deviceTableBody.appendChild(tr);
+  });
+}
+
+// --- Logs Table: Show All Issues from All Users ---
+function updateLogsTable(users) {
+  logsTableBody.innerHTML = "";
+  const allIssues = [];
+  users.forEach(user => {
+    if (Array.isArray(user.history)) {
+      user.history.forEach(entry => {
+        allIssues.push({ ...entry, owner: user.email, uid: user.id });
+      });
+    }
+  });
+  allIssues.sort((a, b) => new Date(b.time) - new Date(a.time));
+  allIssues.forEach(entry => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDate(entry.time)}</td>
+      <td>${entry.owner}</td>
+      <td>${entry.device || "—"}</td>
+      <td>${entry.desc || "—"}</td>
+      <td>
+        ${entry.resolved ? "Resolved" : `<button class="resolve-btn" data-uid="${entry.uid}" data-time="${entry.time}">Mark Resolved</button>`}
+      </td>
+    `;
+    logsTableBody.appendChild(tr);
+  });
+
+  // Wire up "Mark Resolved" buttons
+  logsTableBody.querySelectorAll('.resolve-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      await markIssueResolved(btn.getAttribute('data-uid'), btn.getAttribute('data-time'));
     });
   });
 }
 
-// Devices Table
-function loadDevices() {
-  onSnapshot(collection(db, "devices"), (snapshot) => {
-    const tbody = document.getElementById('devices-table');
-    tbody.innerHTML = "";
-    snapshot.forEach(doc => {
-      const dev = doc.data();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${dev.username || ''}</td>
-                      <td>${dev.type || ''}</td>
-                      <td>${dev.model || dev.info || ''}</td>`;
-      tbody.appendChild(tr);
-    });
-  });
+// --- Mark Issue as Resolved ---
+async function markIssueResolved(userId, entryTime) {
+  const userDocRef = doc(db, "users", userId);
+  const userDoc = await getDoc(userDocRef);
+  const userData = userDoc.data();
+  let history = Array.isArray(userData.history) ? userData.history : [];
+  const idx = history.findIndex(e => e.time === entryTime);
+  if (idx > -1) {
+    history[idx].resolved = true;
+    await updateDoc(userDocRef, { history });
+  }
 }
 
-// Logs Table
-function loadLogs() {
-  onSnapshot(query(collection(db, "logs"), orderBy("createdAt", "desc")), (snapshot) => {
-    const tbody = document.getElementById('logs-table');
-    tbody.innerHTML = "";
-    snapshot.forEach(doc => {
-      const log = doc.data();
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${log.createdAt ? new Date(log.createdAt.seconds*1000).toLocaleString() : ''}</td>
-                      <td>${log.username || ''}</td>
-                      <td>${log.event || ''}</td>`;
-      tbody.appendChild(tr);
-    });
-  });
+// --- Format Date ---
+function formatDate(isoString) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  return d.toLocaleString();
 }
 
-// Alerts List
-function loadAlerts() {
-  onSnapshot(query(collection(db, "alerts"), orderBy("createdAt", "desc")), (snapshot) => {
-    const ul = document.getElementById('alerts-list');
-    ul.innerHTML = '';
-    snapshot.forEach(doc => {
-      const alert = doc.data();
-      const li = document.createElement('li');
-      li.textContent = `${alert.message}`;
-      ul.appendChild(li);
-    });
-  });
+// --- (Optional) Logout Admin ---
+window.adminLogout = function() {
+  signOut(auth).then(() => window.location.href = "../login/login.html");
 }
