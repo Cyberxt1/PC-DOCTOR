@@ -10,9 +10,9 @@
 </head>
 
 <body>
-  <!-- Navbar -->
+ <header>
+   <!-- Navbar -->
   <nav class="navbar">
-    <div class="navbar-container">
       <a href="#" class="logo">TechFix</a>
       <ul class="nav-links" id="navLinks">
         <li><a href="../index.html">Home</a></li>
@@ -20,26 +20,27 @@
       <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
         <span></span><span></span><span></span>
       </button>
-    </div>
   </nav>
 
   <div class="login-container">
     <div class="login-box">
-      <h2>Sign In</h2>
+      <h2>TechFix</h2>
+      <h2>Welcome Back</h2>
       <button class="google-btn" id="google-login-btn">
         <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />
         Sign in with Google
       </button>
       <div class="divider">OR</div>
       <form class="login-form" autocomplete="off">
-        <input type="text" placeholder="Username" disabled />
+        <input type="email" placeholder="email address" disabled />
         <input type="password" placeholder="Password" disabled />
         <button type="button" class="disabled-btn" disabled>
-          Sign in with Username (Coming soon)
+          Sign in with Email (Coming soon)
         </button>
       </form>
     </div>
   </div>
+ </header>
   <!-- Add this before your login.js script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";

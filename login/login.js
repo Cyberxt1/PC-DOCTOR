@@ -26,7 +26,7 @@ document.getElementById('google-login-btn').addEventListener('click', () => {
       console.log("User Info:", user);
 
       // Redirect user or update UI here after login
-      window.location.href = "../user/dashboard.html"; // or wherever you want
+      window.location.href = "../user/user.html"; // or wherever you want
     })
     .catch((error) => {
       // Handle Errors here
