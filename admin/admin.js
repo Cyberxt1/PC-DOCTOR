@@ -1,7 +1,9 @@
-// TechFix Admin Dashboard - dynamic, Firebase-powered (UPDATED)
+// TechFix Admin Dashboard - dynamic, Firebase-powered (FIXED for alert-driven chat)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signOut
+  getAuth,
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import {
   getFirestore,
@@ -11,7 +13,8 @@ import {
   onSnapshot,
   doc,
   getDoc,
-  updateDoc
+  updateDoc,
+  addDoc
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // Firebase config
@@ -33,7 +36,6 @@ const ADMIN_EMAILS = [
 const loadingEl = document.getElementById("loading");
 const appContainer = document.querySelector(".app-container");
 
-// Stats selectors (update if you change stat card order)
 const statTotalUsers = document.querySelectorAll('.stat-value')[0];
 const statActiveSessions = document.querySelectorAll('.stat-value')[1];
 const statFlagged = document.querySelectorAll('.stat-value')[2];
@@ -43,7 +45,7 @@ const deviceStatusTbody = document.getElementById('device-status-tbody');
 const logsTbody = document.getElementById('logs-tbody');
 const alertList = document.querySelector('.alert-list');
 const chatWindow = document.querySelector('.chat-window');
-const chatInput = document.getElementById('input-chat-msg');
+let chatInput = document.getElementById('input-chat-msg');
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -166,10 +168,11 @@ function formatDate(isoString) {
 }
 
 // --- Alert Center: Listen and Interact ---
-let currentLiveAlert = null;
 let chatUnsub = null;
+let currentChatUid = null;
 
 function listenAlerts() {
+  // Only show "new" alerts with resolve button, and "in-progress" alerts with chat
   onSnapshot(
     query(collection(db, "alerts"), where("status", "in", ["new", "in-progress"])),
     snapshot => {
@@ -182,28 +185,36 @@ function listenAlerts() {
           <span style="font-size:0.9em;color:#888;">[${alert.device}] ${alert.details || ""}</span><br>
           <b>Status:</b> ${alert.status}
           ${alert.status === "new"
-            ? `<button data-id="${docSnap.id}" class="resolve-alert-btn">Start Resolving</button>`
-            : `<button data-id="${docSnap.id}" class="chat-alert-btn">Open Chat</button>
-               ${alert.status === "in-progress" ? `<button data-id="${docSnap.id}" class="finish-alert-btn">Mark as Resolved</button>` : ""}`
+            ? `<button data-id="${docSnap.id}" class="resolve-alert-btn">Resolve</button>`
+            : alert.status === "in-progress"
+              ? `<button data-id="${docSnap.id}" class="chat-alert-btn">Open Chat</button>
+                 <button data-id="${docSnap.id}" class="finish-alert-btn">Mark as Resolved</button>`
+              : ""
           }
         `;
         alertList.appendChild(li);
       });
-      // Wire up resolve buttons
+      // Handle resolve buttons
       alertList.querySelectorAll('.resolve-alert-btn').forEach(btn => {
-        btn.onclick = () => handleStartResolve(btn.getAttribute('data-id'));
+        btn.onclick = async () => {
+          const alertId = btn.getAttribute('data-id');
+          await handleResolve(alertId);
+        };
       });
       alertList.querySelectorAll('.chat-alert-btn').forEach(btn => {
         btn.onclick = () => openAdminChat(btn.getAttribute('data-id'));
       });
       alertList.querySelectorAll('.finish-alert-btn').forEach(btn => {
-        btn.onclick = () => markAlertResolved(btn.getAttribute('data-id'));
+        btn.onclick = async () => {
+          await markAlertResolved(btn.getAttribute('data-id'));
+        };
       });
     }
   );
 }
 
-async function handleStartResolve(alertId) {
+// --- Handle "Resolve" click: set to in-progress and open chat ---
+async function handleResolve(alertId) {
   const alertRef = doc(db, "alerts", alertId);
   const alertSnap = await getDoc(alertRef);
   const alert = alertSnap.data();
@@ -220,12 +231,12 @@ async function handleStartResolve(alertId) {
     admin: auth.currentUser.email
   });
   if (!userIsOnline) {
-    // Placehold: send email (in reality, trigger via backend/Cloud Function)
     alert("User is offline. An email should be sent to notify them.");
   }
   openAdminChat(alertId);
 }
 
+// --- Mark alert as resolved and notify the user in chat ---
 async function markAlertResolved(alertId) {
   const alertRef = doc(db, "alerts", alertId);
   await updateDoc(alertRef, { status: "resolved" });
@@ -235,13 +246,18 @@ async function markAlertResolved(alertId) {
   await addAdminChatMsg(alert.uid, "Your issue has been marked as resolved. If you're satisfied, please mark as resolved in your chat.");
 }
 
+// --- Open chat with user for a given alert ---
 function openAdminChat(alertId) {
-  // Load alert and open chat interface
-  currentLiveAlert = alertId;
-  // Get alert info
   getDoc(doc(db, "alerts", alertId)).then(alertSnap => {
     const alert = alertSnap.data();
-    chatWindow.innerHTML = `<b>Chat with ${alert.email} about: ${alert.desc}</b><hr><div id="admin-chat-messages" style="height:200px;overflow-y:auto;background:#f6f6f6;padding:10px;border-radius:5px;margin-bottom:7px;"></div>`;
+    currentChatUid = alert.uid;
+    chatWindow.innerHTML = `
+      <b>Chat with ${alert.email} about: ${alert.desc}</b>
+      <hr>
+      <div id="admin-chat-messages" style="height:200px;overflow-y:auto;background:#f6f6f6;padding:10px;border-radius:5px;margin-bottom:7px;"></div>
+      <input type="text" id="input-chat-msg" placeholder="Type your message..." />
+    `;
+    chatInput = document.getElementById('input-chat-msg');
     loadAdminChat(alert.uid);
     chatInput.disabled = false;
     chatInput.placeholder = "Type message to user...";
