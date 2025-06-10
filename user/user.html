@@ -1,12 +1,12 @@
 // user.js for TechFix User Dashboard
 // Requires: Firebase Authentication and Firestore
-// Make sure to use: <script src="user.js" type="module"></script>
+// Ensure your HTML uses: <script src="user.js" type="module"></script>
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// --- Firebase config --- (replace with your latest config if changed)
+// --- Firebase config ---
 const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",

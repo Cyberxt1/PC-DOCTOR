@@ -1,9 +1,12 @@
-// Import Firebase modules
+// user.js for TechFix User Dashboard
+// Requires: Firebase Authentication and Firestore
+// Ensure your HTML uses: <script src="user.js" type="module"></script>
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// Firebase config
+// --- Firebase config ---
 const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",
@@ -14,11 +17,11 @@ const firebaseConfig = {
   measurementId: "G-69MKL5ETH7"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- DOM Elements ---
 const dashboard = document.getElementById("dashboard");
 const userDisplay = document.getElementById("user-display");
 const logoutBtn = document.getElementById("logout-btn");
@@ -30,16 +33,17 @@ const issueForm = document.getElementById("issue-form");
 const formMsg = document.getElementById("form-msg");
 const historyList = document.getElementById("history-list");
 
+// --- State ---
 let currentUser = null;
 
-// Auth check
+// --- Auth State Check & User Data Sync ---
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
     dashboard.classList.remove("hidden");
     userDisplay.textContent = user.displayName || user.email || "User";
 
-    // Save user profile to Firestore
+    // Save/update user profile to Firestore
     const userDocRef = doc(db, "users", user.uid);
     const userSnapshot = await getDoc(userDocRef);
     if (!userSnapshot.exists()) {
@@ -51,16 +55,16 @@ onAuthStateChanged(auth, async (user) => {
         history: []
       });
     } else {
-      // Optionally update profile info on login
+      // Optionally update profile info every login
       await updateDoc(userDocRef, {
         displayName: user.displayName || "",
         email: user.email || "",
         photoURL: user.photoURL || ""
       });
     }
-    // Load history from Firestore
     listenToHistory();
   } else {
+    // Not logged in
     window.location.href = "../login/login.html";
   }
 });
@@ -122,13 +126,23 @@ issueForm?.addEventListener('submit', async function(e) {
   let details = '';
   if (devType === 'phone') {
     const model = document.getElementById('phone-model')?.value || '';
+    if (!model) {
+      formMsg.textContent = 'Please select your phone model.';
+      formMsg.style.color = '#f44';
+      return;
+    }
     details = `Phone Model: ${model}`;
   } else if (devType === 'laptop') {
     const proc = document.getElementById('laptop-processor')?.value || '';
     const os = document.getElementById('laptop-os')?.value || '';
+    if (!proc || !os) {
+      formMsg.textContent = 'Please fill in all laptop details.';
+      formMsg.style.color = '#f44';
+      return;
+    }
     details = `Processor: ${proc}, OS: ${os}`;
   }
-  if (!desc || !devType || (devType === 'phone' && !details.includes('Model: ')) || (devType === 'laptop' && (!details.includes('Processor:') || !details.includes('OS:')))) {
+  if (!desc || !devType) {
     formMsg.textContent = 'Please fill in all required fields.';
     formMsg.style.color = '#f44';
     return;
@@ -160,7 +174,6 @@ issueForm?.addEventListener('submit', async function(e) {
 function listenToHistory() {
   if (!currentUser) return;
   const userDocRef = doc(db, "users", currentUser.uid);
-  // Live update
   onSnapshot(userDocRef, (docSnap) => {
     const data = docSnap.data();
     historyList.innerHTML = '';
