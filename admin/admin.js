@@ -6,6 +6,7 @@ import {
 import {
   getFirestore,
   collection,
+  query,
   onSnapshot,
   doc,
   getDoc,
@@ -46,7 +47,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let chatUnsub = null;
-let currentChatAlert = null;
 
 // --------- AUTH ---------
 onAuthStateChanged(auth, user => {
@@ -61,7 +61,7 @@ onAuthStateChanged(auth, user => {
   if (loadingEl) loadingEl.style.display = "none";
   if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
-  listenNewAlerts();
+  listenNewAlertsAndShowChat();
 });
 
 // --------- USER DATA ---------
@@ -154,31 +154,34 @@ function formatDate(isoString) {
 }
 
 // --------- NEW ALERTS & CHAT ---------
-function listenNewAlerts() {
-  // Listen for ALL new alerts and show them
+function listenNewAlertsAndShowChat() {
+  // Listen for ALL alerts and filter by status
   const q = collection(db, "alerts");
   onSnapshot(q, (snapshot) => {
     alertList.innerHTML = '';
+    let inProgressAlert = null;
     const newAlerts = [];
-    const inProgressAlerts = [];
     snapshot.forEach(docSnap => {
       const alert = docSnap.data();
       alert.id = docSnap.id;
       if (alert.status === "new") {
         newAlerts.push(alert);
-      } else if (alert.status === "in-progress" && alert.admin === auth.currentUser.email) {
-        inProgressAlerts.push(alert);
+      }
+      // Only show in-progress for THIS admin
+      if (alert.status === "in-progress" && alert.admin === auth.currentUser.email) {
+        inProgressAlert = alert;
       }
     });
 
-    // Show all new alerts
+    // Always show ALL new alerts
     newAlerts.sort((a, b) => new Date(b.time) - new Date(a.time));
     newAlerts.forEach(alert => renderNewAlert(alert));
 
-    // Only show one chat at a time: the admin's in-progress alert
-    if (inProgressAlerts.length > 0) {
-      // Only the first is shown
-      renderActiveAlert(inProgressAlerts[0]);
+    // Show chat for the in-progress alert ONLY (if set by this admin)
+    if (inProgressAlert) {
+      renderActiveAlert(inProgressAlert);
+    } else {
+      chatWindow.innerHTML = ''; // No open chat if not in-progress
     }
   });
 }
@@ -213,52 +216,17 @@ function renderNewAlert(alert) {
   `;
   alertList.appendChild(li);
   li.querySelector('.chat-alert-btn').onclick = async () => {
-    // Set this alert as in-progress and assign to admin
+    // Set this alert as in-progress for this admin, then open chat
     await updateDoc(doc(db, "alerts", alert.id), {
       status: "in-progress",
       admin: auth.currentUser.email
     });
-    renderActiveAlert({ ...alert, status: "in-progress", admin: auth.currentUser.email });
+    // The listener will pick this up and show the chat
   };
 }
 
 function renderActiveAlert(alert) {
-  // Show chat for this alert only
-  chatWindow.innerHTML = '';
-  const li = document.createElement('li');
-  li.innerHTML = `
-    <div class="alert-card" style="
-      background:#e8ffe6;
-      border-radius:12px; 
-      box-shadow:0 2px 12px #0001;
-      margin:18px 0 10px 0;
-      padding:18px 18px 10px 18px;
-      border-left:5px solid #16b978; 
-      position:relative;">
-      <div style="font-weight:600;font-size:1.13em;color:#24292f;">
-        <span style="color:#16b978;">&#128172;</span> ${alert.email}
-      </div>
-      <div style="margin:6px 0 0 0;">${alert.desc}</div>
-      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
-      <div style="margin:8px 0 2px 0;">
-        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Open Chat</button>
-        <button class="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;">Mark as Resolved</button>
-      </div>
-    </div>
-  `;
-  alertList.appendChild(li);
-  li.querySelector('.chat-alert-btn').onclick = () => openAdminChat(alert.uid, alert);
-  li.querySelector('.finish-alert-btn').onclick = async () => {
-    await markAlertAndUserHistoryResolved(alert);
-    chatWindow.innerHTML = '';
-    // Set alert to resolved, will be removed from in-progress
-  };
-  // Also render chat window
-  openAdminChat(alert.uid, alert);
-}
-
-// --------- CHAT ---------
-function openAdminChat(uid, alert) {
+  // Show the chat window for this alert
   chatWindow.innerHTML = `
     <div class="chatbox" style="background:#f9f9fa;border-radius:15px;box-shadow:0 2px 18px #0002;padding:0 0 10px 0;margin:8px 0 0 0;max-width:520px;">
       <div style="border-bottom:1px solid #e8e8e8;padding:12px 18px 10px 18px;font-weight:500;background:#fff;border-top-left-radius:15px;border-top-right-radius:15px;">
@@ -269,16 +237,19 @@ function openAdminChat(uid, alert) {
         <input type="text" id="input-chat-msg" style="flex:1;padding:10px;border-radius:7px;border:1px solid #cacaca;font-size:1em;" placeholder="Type your message..." autocomplete="off" required />
         <button type="submit" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;">Send</button>
       </form>
+      <button id="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin:12px 0 0 16px;">Mark as Resolved</button>
     </div>
   `;
-  ensureComplaintIsFirstMessage(uid, alert);
-  loadAdminChat(uid);
+  ensureComplaintIsFirstMessage(alert.uid, alert);
+  loadAdminChat(alert.uid);
+
+  // Send chat message
   const chatForm = document.getElementById('admin-chat-form');
   const chatInput = document.getElementById('input-chat-msg');
   chatForm.onsubmit = async (e) => {
     e.preventDefault();
     if (chatInput.value.trim()) {
-      await addDoc(collection(db, "chats", uid, "messages"), {
+      await addDoc(collection(db, "chats", alert.uid, "messages"), {
         text: chatInput.value.trim(),
         from: "admin",
         timestamp: Date.now()
@@ -286,8 +257,15 @@ function openAdminChat(uid, alert) {
       chatInput.value = "";
     }
   };
+
+  // Mark as resolved
+  document.getElementById('finish-alert-btn').onclick = async () => {
+    await markAlertAndUserHistoryResolved(alert);
+    chatWindow.innerHTML = '';
+  };
 }
 
+// --------- CHAT ---------
 async function ensureComplaintIsFirstMessage(uid, alert) {
   const chatColRef = collection(db, "chats", uid, "messages");
   const chatSnap = await getDocs(chatColRef);
