@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - improved live chat flow for alert center
+// TechFix Admin Dashboard - New Alerts always visible, open chat per alert, WhatsApp-style chat
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -46,7 +46,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let chatUnsub = null;
-let currentActiveAlert = null;
+let currentChatAlert = null;
 
 // --------- AUTH ---------
 onAuthStateChanged(auth, user => {
@@ -61,7 +61,7 @@ onAuthStateChanged(auth, user => {
   if (loadingEl) loadingEl.style.display = "none";
   if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
-  listenLiveAlerts();
+  listenNewAlerts();
 });
 
 // --------- USER DATA ---------
@@ -153,33 +153,37 @@ function formatDate(isoString) {
   return d.toLocaleString();
 }
 
-// --------- ALERT CENTER + LIVE CHAT ---------
-function listenLiveAlerts() {
-  onSnapshot(collection(db, "alerts"), (snapshot) => {
-    let unresolved = [];
-    let inProgress = null;
+// --------- NEW ALERTS & CHAT ---------
+function listenNewAlerts() {
+  // Listen for ALL new alerts and show them
+  const q = collection(db, "alerts");
+  onSnapshot(q, (snapshot) => {
+    alertList.innerHTML = '';
+    const newAlerts = [];
+    const inProgressAlerts = [];
     snapshot.forEach(docSnap => {
       const alert = docSnap.data();
-      if (alert.status === "in-progress") {
-        inProgress = { ...alert, id: docSnap.id };
-      } else if (alert.status === "new") {
-        unresolved.push({ ...alert, id: docSnap.id });
+      alert.id = docSnap.id;
+      if (alert.status === "new") {
+        newAlerts.push(alert);
+      } else if (alert.status === "in-progress" && alert.admin === auth.currentUser.email) {
+        inProgressAlerts.push(alert);
       }
     });
 
-    alertList.innerHTML = "";
-    if (inProgress) {
-      currentActiveAlert = inProgress;
-      renderActiveAlert(inProgress);
-    } else {
-      currentActiveAlert = null;
-      unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
-      unresolved.forEach(alert => renderUnresolvedAlert(alert));
+    // Show all new alerts
+    newAlerts.sort((a, b) => new Date(b.time) - new Date(a.time));
+    newAlerts.forEach(alert => renderNewAlert(alert));
+
+    // Only show one chat at a time: the admin's in-progress alert
+    if (inProgressAlerts.length > 0) {
+      // Only the first is shown
+      renderActiveAlert(inProgressAlerts[0]);
     }
   });
 }
 
-function renderUnresolvedAlert(alert) {
+function renderNewAlert(alert) {
   const li = document.createElement('li');
   li.innerHTML = `
     <div class="alert-card" style="
@@ -195,7 +199,7 @@ function renderUnresolvedAlert(alert) {
       </div>
       <div style="margin:6px 0 0 0;">${alert.desc}</div>
       <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
-      <button class="resolve-alert-btn" style="
+      <button class="chat-alert-btn" style="
         background:#fa4d56;color:#fff;
         border:none;border-radius:6px;
         font-weight:600;padding:6px 16px;
@@ -203,22 +207,24 @@ function renderUnresolvedAlert(alert) {
         font-size:.98em;
         box-shadow:0 1px 3px #0001;
         transition:background .2s;">
-        Resolve
+        Chat with User
       </button>
     </div>
   `;
   alertList.appendChild(li);
-  li.querySelector('.resolve-alert-btn').onclick = async () => {
-    // Set this alert as in-progress and lock out others
+  li.querySelector('.chat-alert-btn').onclick = async () => {
+    // Set this alert as in-progress and assign to admin
     await updateDoc(doc(db, "alerts", alert.id), {
       status: "in-progress",
       admin: auth.currentUser.email
     });
+    renderActiveAlert({ ...alert, status: "in-progress", admin: auth.currentUser.email });
   };
 }
 
 function renderActiveAlert(alert) {
-  alertList.innerHTML = "";
+  // Show chat for this alert only
+  chatWindow.innerHTML = '';
   const li = document.createElement('li');
   li.innerHTML = `
     <div class="alert-card" style="
@@ -235,7 +241,7 @@ function renderActiveAlert(alert) {
       <div style="margin:6px 0 0 0;">${alert.desc}</div>
       <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
       <div style="margin:8px 0 2px 0;">
-        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Chat</button>
+        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Open Chat</button>
         <button class="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;">Mark as Resolved</button>
       </div>
     </div>
@@ -245,7 +251,10 @@ function renderActiveAlert(alert) {
   li.querySelector('.finish-alert-btn').onclick = async () => {
     await markAlertAndUserHistoryResolved(alert);
     chatWindow.innerHTML = '';
+    // Set alert to resolved, will be removed from in-progress
   };
+  // Also render chat window
+  openAdminChat(alert.uid, alert);
 }
 
 // --------- CHAT ---------
