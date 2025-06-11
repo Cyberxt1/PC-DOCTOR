@@ -1,5 +1,4 @@
-// TechFix User Dashboard - Robust Version (prevents stuck on loading, safe on empty Firestore)
-// Requires: Firebase Authentication and Firestore
+// TechFix User Dashboard - User can send complaints AND live chat with admin if admin initiates chat
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
@@ -14,9 +13,7 @@ import {
   arrayUnion,
   onSnapshot,
   addDoc,
-  collection,
-  query,
-  where
+  collection
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // --- Firebase Setup ---
@@ -24,7 +21,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",
   projectId: "techfix-ef115",
-  storageBucket: "techfix-ef115.firebasestorage.app",
+  storageBucket: "techfix-ef115.appspot.com",
   messagingSenderId: "798114675752",
   appId: "1:798114675752:web:33450b57585b4a643b891d",
   measurementId: "G-69MKL5ETH7"
@@ -34,7 +31,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- DOM Elements ---
 const $ = id => document.getElementById(id);
 const loading = $("loading");
 const dashboard = $("dashboard");
@@ -52,14 +48,11 @@ const chatMessages = $("chat-messages");
 const chatForm = $("chat-form");
 const chatInput = $("chat-input");
 
-// --- State ---
 let currentUser = null;
-let currentAlertId = null;
-let chatUnsub = null;
-let alertUnsub = null;
 let lastUnresolvedIssue = null;
+let chatUnsub = null;
 
-// --- Authentication Listener ---
+// --- Auth ---
 onAuthStateChanged(auth, async user => {
   try {
     if (!user) {
@@ -73,9 +66,8 @@ onAuthStateChanged(auth, async user => {
     if (loading) loading.style.display = "none";
     if (dashboard) dashboard.classList.remove("hidden");
     if (userDisplay) userDisplay.textContent = user.displayName || user.email || "User";
-
     listenToHistory();
-    listenToAlerts();
+    listenForActiveChat();
     window.addEventListener("beforeunload", updateLastOnline);
     setInterval(updateLastOnline, 60000);
   } catch (err) {
@@ -84,7 +76,6 @@ onAuthStateChanged(auth, async user => {
     alert("Dashboard error: " + err.message);
   }
 });
-
 async function syncUserProfile(user) {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
@@ -101,7 +92,6 @@ async function syncUserProfile(user) {
     await updateDoc(ref, data);
   }
 }
-
 async function updateLastOnline() {
   if (currentUser) {
     try {
@@ -152,11 +142,9 @@ deviceType?.addEventListener("change", () => {
 issueForm?.addEventListener("submit", async e => {
   e.preventDefault();
   if (!currentUser) return window.location.href = "../login/login.html";
-
   const desc = $("issue-desc").value.trim();
   const devType = deviceType.value;
   let details = '';
-
   if (devType === "phone") {
     const model = $("phone-model")?.value;
     if (!model) return showMsg("Select your phone model.");
@@ -167,10 +155,7 @@ issueForm?.addEventListener("submit", async e => {
     if (!proc || !os) return showMsg("Fill in all laptop details.");
     details = `Processor: ${proc}, OS: ${os}`;
   } else return showMsg("Choose a device type.");
-
   if (!desc) return showMsg("Please describe your issue.");
-
-  // --- Prevent duplicate unresolved issue ---
   if (lastUnresolvedIssue && !lastUnresolvedIssue.resolved) {
     if (
       lastUnresolvedIssue.desc.trim().toLowerCase() === desc.toLowerCase() &&
@@ -179,10 +164,8 @@ issueForm?.addEventListener("submit", async e => {
       return showMsg("You already have an unresolved issue with the same description and device.");
     }
   }
-
   const time = new Date().toISOString();
   const entry = { time, device: devType, desc, details, resolved: false };
-
   try {
     const ref = doc(db, "users", currentUser.uid);
     await updateDoc(ref, { history: arrayUnion(entry) });
@@ -198,7 +181,6 @@ issueForm?.addEventListener("submit", async e => {
     showMsg("Error: " + err.message);
   }
 });
-
 function showMsg(msg, color = "#f44") {
   if (!formMsg) return;
   formMsg.textContent = msg;
@@ -213,11 +195,9 @@ function listenToHistory() {
   onSnapshot(ref, snap => {
     const data = snap.exists() ? snap.data() : { history: [] };
     const history = Array.isArray(data.history) ? data.history : [];
-    // Find most recent unresolved issue for duplicate check
     lastUnresolvedIssue = history
       .filter(h => !h.resolved)
       .sort((a, b) => new Date(b.time) - new Date(a.time))[0] || null;
-
     historyList.innerHTML = history.length ? '' : '<li>No history yet.</li>';
     [...history]
       .sort((a, b) => new Date(b.time) - new Date(a.time))
@@ -236,88 +216,67 @@ function listenToHistory() {
   });
 }
 
-// --- Live Alerts & WhatsApp-Style Chat ---
-function listenToAlerts() {
-  if (alertUnsub) alertUnsub();
-  const q = query(collection(db, "alerts"),
-    where("uid", "==", currentUser.uid),
-    where("status", "in", ["in-progress", "resolved"])
-  );
-  alertUnsub = onSnapshot(q, snap => {
-    let active = false;
-    snap.forEach(docSnap => {
-      const alert = docSnap.data();
-      if (!active) {
-        currentAlertId = docSnap.id;
-        showChatBox(alert.status === "resolved", alert.userConfirmed);
-        active = true;
-      }
-    });
-    if (!active) {
+// --- Live Chat (User Side): Listen for messages on ANY unresolved issue ---
+function listenForActiveChat() {
+  if (!currentUser) return;
+  // Find their latest unresolved issue
+  const ref = doc(db, "users", currentUser.uid);
+  onSnapshot(ref, async (snap) => {
+    const userData = snap.exists() ? snap.data() : {};
+    const history = Array.isArray(userData.history) ? userData.history : [];
+    const unresolved = history.filter(h => !h.resolved).sort((a, b) => new Date(b.time) - new Date(a.time));
+    if (!unresolved.length) {
       hideChatBox();
-      currentAlertId = null;
+      return;
     }
-  }, err => {
-    hideChatBox();
-    currentAlertId = null;
-    if (chatMessages) chatMessages.innerHTML = `<div style="color:red">Error loading chat</div>`;
+    // Now, see if there are any admin messages for any unresolved issue
+    const currentIssue = unresolved[0];
+    showChatBox(currentIssue);
   });
 }
 
-function showChatBox(isResolved = false, userConfirmed = false) {
+function showChatBox(issue) {
   if (!chatSection) return;
   chatSection.style.display = "block";
   if (chatUnsub) chatUnsub();
   const ref = collection(db, "chats", currentUser.uid, "messages");
   chatUnsub = onSnapshot(ref, snap => {
     chatMessages.innerHTML = '';
-    snap.docs.sort((a, b) => a.data().timestamp - b.data().timestamp).forEach(d => {
-      const m = d.data();
-      const div = document.createElement("div");
-      div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
-      div.innerHTML = `<span class="wa-bubble ${m.from === "user" ? "user" : "admin"}">${m.text}</span>`;
-      chatMessages.appendChild(div);
-    });
+    snap.docs
+      .filter(d => d.data().issueTime === issue.time)
+      .sort((a, b) => a.data().timestamp - b.data().timestamp)
+      .forEach(d => {
+        const m = d.data();
+        const div = document.createElement("div");
+        div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
+        div.innerHTML = `<span class="wa-bubble ${m.from === "user" ? "user" : "admin"}">${m.text}</span>`;
+        chatMessages.appendChild(div);
+      });
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
 
-  let btn = $("user-resolve-btn");
-  if (isResolved && !userConfirmed && !btn) {
-    btn = document.createElement("button");
-    btn.id = "user-resolve-btn";
-    btn.textContent = "Mark as Resolved";
-    Object.assign(btn.style, {
-      display: "block", margin: "15px auto", padding: "8px 18px",
-      background: "#2da654", color: "#fff", border: "none",
-      borderRadius: "7px", cursor: "pointer"
+  // Enable chat input
+  chatForm.style.display = "";
+  chatInput.disabled = false;
+
+  chatForm.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    const text = chatInput.value.trim();
+    if (!text) return;
+    await addDoc(collection(db, "chats", currentUser.uid, "messages"), {
+      text,
+      from: "user",
+      timestamp: Date.now(),
+      issueTime: issue.time
     });
-    btn.onclick = () => {
-      updateDoc(doc(db, "alerts", currentAlertId), { userConfirmed: true });
-      btn.remove();
-    };
-    chatSection.appendChild(btn);
-  } else if (btn && (!isResolved || userConfirmed)) {
-    btn.remove();
-  }
+    chatInput.value = "";
+  };
 }
 
 function hideChatBox() {
   if (!chatSection) return;
   chatSection.style.display = "none";
   if (chatUnsub) chatUnsub();
-  $("user-resolve-btn")?.remove();
+  chatForm.style.display = "none";
 }
-
-// --- Send Chat Message ---
-chatForm?.addEventListener("submit", async e => {
-  e.preventDefault();
-  if (!currentUser || !currentAlertId) return;
-  const text = chatInput.value.trim();
-  if (!text) return;
-  await addDoc(collection(db, "chats", currentUser.uid, "messages"), {
-    text,
-    from: "user",
-    timestamp: Date.now()
-  });
-  chatInput.value = "";
-});
