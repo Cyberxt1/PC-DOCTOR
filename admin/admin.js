@@ -61,7 +61,7 @@ onAuthStateChanged(auth, user => {
   if (loadingEl) loadingEl.style.display = "none";
   if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
-  listenNewAlertsAndShowChat();
+  listenNonResolvedAlertsAndShowChat();
 });
 
 // --------- USER DATA ---------
@@ -154,76 +154,87 @@ function formatDate(isoString) {
 }
 
 // --------- NEW ALERTS & CHAT ---------
-function listenNewAlertsAndShowChat() {
-  // Listen for ALL alerts and filter by status
-  const q = collection(db, "alerts");
-  onSnapshot(q, (snapshot) => {
+function listenNonResolvedAlertsAndShowChat() {
+  const alertsRef = collection(db, "alerts");
+  onSnapshot(alertsRef, (snapshot) => {
     alertList.innerHTML = '';
-    let inProgressAlert = null;
-    const newAlerts = [];
+    let myInProgressAlert = null;
+    const nonResolved = [];
+
     snapshot.forEach(docSnap => {
       const alert = docSnap.data();
       alert.id = docSnap.id;
-      if (alert.status === "new") {
-        newAlerts.push(alert);
+      if (alert.status !== "resolved") {
+        nonResolved.push(alert);
       }
-      // Only show in-progress for THIS admin
       if (alert.status === "in-progress" && alert.admin === auth.currentUser.email) {
-        inProgressAlert = alert;
+        myInProgressAlert = alert;
       }
     });
 
-    // Always show ALL new alerts
-    newAlerts.sort((a, b) => new Date(b.time) - new Date(a.time));
-    newAlerts.forEach(alert => renderNewAlert(alert));
+    // Show all non-resolved alerts
+    nonResolved.sort((a, b) => new Date(b.time) - new Date(a.time));
+    nonResolved.forEach(alert => renderNonResolvedAlert(alert, myInProgressAlert));
 
-    // Show chat for the in-progress alert ONLY (if set by this admin)
-    if (inProgressAlert) {
-      renderActiveAlert(inProgressAlert);
+    // Show chat for my in-progress alert only
+    if (myInProgressAlert) {
+      renderActiveAlert(myInProgressAlert);
     } else {
-      chatWindow.innerHTML = ''; // No open chat if not in-progress
+      chatWindow.innerHTML = '';
     }
   });
 }
 
-function renderNewAlert(alert) {
+function renderNonResolvedAlert(alert, myInProgressAlert) {
   const li = document.createElement('li');
+  let button = '';
+  let isMine = alert.admin === auth.currentUser.email;
+  if (alert.status === "new") {
+    button = `<button class="chat-alert-btn"
+      style="background:#fa4d56;color:#fff;border:none;border-radius:6px;font-weight:600;padding:6px 16px;margin-top:6px;cursor:pointer;font-size:.98em;box-shadow:0 1px 3px #0001;transition:background .2s;">
+        Chat with User
+      </button>`;
+  } else if (alert.status === "in-progress") {
+    if (isMine) {
+      button = `<button class="chat-alert-btn"
+        style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-top:6px;">
+        Continue Chat
+      </button>`;
+    } else {
+      button = `<span style="color:#888;font-size:0.99em;">In progress by ${alert.admin || "someone"}</span>`;
+    }
+  }
   li.innerHTML = `
-    <div class="alert-card" style="
-      background:#fff; 
-      border-radius:12px; 
-      box-shadow:0 2px 12px #0001; 
-      margin:18px 0 10px 0; 
-      padding:18px 18px 10px 18px; 
-      border-left:5px solid #fa4d56; 
-      position:relative;">
+    <div class="alert-card" style="background:#fff; border-radius:12px; box-shadow:0 2px 12px #0001; margin:18px 0 10px 0; padding:18px 18px 10px 18px; border-left:5px solid #fa4d56; position:relative;">
       <div style="font-weight:600;font-size:1.13em;color:#24292f;">
         <span style="color:#fa4d56;">&#9888;</span> ${alert.email}
       </div>
       <div style="margin:6px 0 0 0;">${alert.desc}</div>
       <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
-      <button class="chat-alert-btn" style="
-        background:#fa4d56;color:#fff;
-        border:none;border-radius:6px;
-        font-weight:600;padding:6px 16px;
-        margin-top:6px;cursor:pointer;
-        font-size:.98em;
-        box-shadow:0 1px 3px #0001;
-        transition:background .2s;">
-        Chat with User
-      </button>
+      ${button}
     </div>
   `;
+
   alertList.appendChild(li);
-  li.querySelector('.chat-alert-btn').onclick = async () => {
-    // Set this alert as in-progress for this admin, then open chat
-    await updateDoc(doc(db, "alerts", alert.id), {
-      status: "in-progress",
-      admin: auth.currentUser.email
-    });
-    // The listener will pick this up and show the chat
-  };
+
+  // Button handler
+  const btn = li.querySelector('.chat-alert-btn');
+  if (btn) {
+    btn.onclick = async () => {
+      // If not already in-progress for you, set to in-progress and assign admin
+      if (alert.status === "new" || !isMine) {
+        await updateDoc(doc(db, "alerts", alert.id), {
+          status: "in-progress",
+          admin: auth.currentUser.email
+        });
+      }
+      // The listener will pick this up and show the chat
+    };
+  }
 }
+
+
+
 
 function renderActiveAlert(alert) {
   // Show the chat window for this alert
