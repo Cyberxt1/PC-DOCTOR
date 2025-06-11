@@ -1,5 +1,4 @@
-// TechFix User Dashboard - Optimized
-// Requires: Firebase Authentication and Firestore
+// TechFix User Dashboard - Enhanced: no duplicate issues, WhatsApp chat style, instant admin messages
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
@@ -16,12 +15,11 @@ import {
   addDoc,
   collection,
   query,
-  where,
-  getDocs
+  where
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // --- Firebase Setup ---
-const firebaseConfig = { /* your config */ };
+const firebaseConfig = { /* your config */ }; // <-- fill this in
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -49,10 +47,16 @@ let currentUser = null;
 let currentAlertId = null;
 let chatUnsub = null;
 let alertUnsub = null;
+let lastUnresolvedIssue = null;
 
 // --- Authentication Listener ---
 onAuthStateChanged(auth, async user => {
-  if (!user) return location.href = "../login/login.html";
+  if (!user) {
+    loading.style.display = "none";
+    dashboard.classList.add("hidden");
+    location.href = "../login/login.html";
+    return;
+  }
   currentUser = user;
   try {
     await syncUserProfile(user);
@@ -67,6 +71,7 @@ onAuthStateChanged(auth, async user => {
   } catch (err) {
     alert("Dashboard error: " + err.message);
     loading.textContent = "Error: " + err.message;
+    dashboard.classList.add("hidden");
   }
 });
 
@@ -151,6 +156,18 @@ issueForm?.addEventListener("submit", async e => {
     details = `Processor: ${proc}, OS: ${os}`;
   } else return showMsg("Choose a device type.");
 
+  if (!desc) return showMsg("Please describe your issue.");
+
+  // --- Prevent duplicate unresolved issue ---
+  if (lastUnresolvedIssue && !lastUnresolvedIssue.resolved) {
+    if (
+      lastUnresolvedIssue.desc.trim().toLowerCase() === desc.toLowerCase() &&
+      lastUnresolvedIssue.device === devType
+    ) {
+      return showMsg("You already have an unresolved issue with the same description and device.");
+    }
+  }
+
   const time = new Date().toISOString();
   const entry = { time, device: devType, desc, details, resolved: false };
 
@@ -181,10 +198,17 @@ function listenToHistory() {
   const ref = doc(db, "users", currentUser.uid);
   onSnapshot(ref, snap => {
     const history = snap.data()?.history || [];
+    // Find most recent unresolved issue for duplicate check
+    lastUnresolvedIssue = history
+      .filter(h => !h.resolved)
+      .sort((a, b) => new Date(b.time) - new Date(a.time))[0] || null;
+
     historyList.innerHTML = history.length ? '' : '<li>No history yet.</li>';
     [...history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(h => {
       const status = h.resolved
-        ? `<span style="color:#23a13a;font-weight:bold;"><svg ...></svg> Resolved</span>`
+        ? `<span style="color:#23a13a;font-weight:bold;vertical-align:middle;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Resolved</span>`
         : `<span style="color:#fa4d56;font-weight:bold;">Unresolved</span>`;
       const li = document.createElement("li");
       li.innerHTML = `[${new Date(h.time).toLocaleString()}] (${h.device}) - ${h.desc} [${h.details}] ${status}`;
@@ -193,7 +217,7 @@ function listenToHistory() {
   });
 }
 
-// --- Live Alerts & Chat ---
+// --- Live Alerts & WhatsApp-Style Chat ---
 function listenToAlerts() {
   if (alertUnsub) alertUnsub();
   const q = query(collection(db, "alerts"),
@@ -226,16 +250,16 @@ function showChatBox(isResolved = false, userConfirmed = false) {
     snap.docs.sort((a, b) => a.data().timestamp - b.data().timestamp).forEach(d => {
       const m = d.data();
       const div = document.createElement("div");
-      div.style.cssText = `display:flex; justify-content:${m.from === "user" ? "flex-end" : "flex-start"}; margin:5px 0`;
-      div.innerHTML = `<span class="chat-message ${m.from}">${m.text}</span>`;
+      div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
+      div.innerHTML = `<span class="wa-bubble ${m.from === "user" ? "user" : "admin"}">${m.text}</span>`;
       chatMessages.appendChild(div);
     });
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
 
-  const resolveBtn = $("user-resolve-btn");
-  if (isResolved && !userConfirmed && !resolveBtn) {
-    const btn = document.createElement("button");
+  let btn = $("user-resolve-btn");
+  if (isResolved && !userConfirmed && !btn) {
+    btn = document.createElement("button");
     btn.id = "user-resolve-btn";
     btn.textContent = "Mark as Resolved";
     Object.assign(btn.style, {
@@ -248,7 +272,9 @@ function showChatBox(isResolved = false, userConfirmed = false) {
       btn.remove();
     };
     chatSection.appendChild(btn);
-  } else if (resolveBtn) resolveBtn.remove();
+  } else if (btn && (!isResolved || userConfirmed)) {
+    btn.remove();
+  }
 }
 
 function hideChatBox() {
@@ -263,18 +289,7 @@ chatForm?.addEventListener("submit", async e => {
   if (!currentUser || !currentAlertId) return;
   const text = chatInput.value.trim();
   if (!text) return;
-
-  const ref = collection(db, "chats", currentUser.uid, "messages");
-
-  const q = query(ref, where("from", "==", "user"));
-  const snap = await getDocs(q);
-  const messages = snap.docs.map(d => d.data()).sort((a, b) => b.timestamp - a.timestamp);
-  if (messages[0]?.text === text) {
-    alert("You already sent this message.");
-    return;
-  }
-
-  await addDoc(ref, {
+  await addDoc(collection(db, "chats", currentUser.uid, "messages"), {
     text,
     from: "user",
     timestamp: Date.now()
