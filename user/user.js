@@ -1,5 +1,4 @@
-// TechFix User Dashboard - User can send complaints AND live chat with admin if admin initiates chat
-
+// TechFix User Dashboard - Full rewrite: History, Troubleshoot, Ask AI, and always-on Chat with Admin/AI
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -16,7 +15,7 @@ import {
   collection
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// --- Firebase Setup ---
+// Firebase Setup
 const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",
@@ -43,36 +42,35 @@ const deviceDetails = $("device-details");
 const issueForm = $("issue-form");
 const formMsg = $("form-msg");
 const historyList = $("history-list");
-const chatSection = $("chat");
-const chatMessages = $("chat-messages");
-const chatForm = $("chat-form");
-const chatInput = $("chat-input");
+const livechatSection = $("livechat");
+const livechatMessages = $("livechat-messages");
+const livechatForm = $("livechat-form");
+const livechatInput = $("livechat-input");
 
 let currentUser = null;
 let lastUnresolvedIssue = null;
-let chatUnsub = null;
+let livechatUnsub = null;
 
 // --- Auth ---
 onAuthStateChanged(auth, async user => {
   try {
     if (!user) {
-      if (loading) loading.style.display = "none";
-      if (dashboard) dashboard.classList.add("hidden");
+      loading.style.display = "none";
+      dashboard.classList.add("hidden");
       window.location.href = "../login/login.html";
       return;
     }
     currentUser = user;
     await syncUserProfile(user);
-    if (loading) loading.style.display = "none";
-    if (dashboard) dashboard.classList.remove("hidden");
-    if (userDisplay) userDisplay.textContent = user.displayName || user.email || "User";
+    loading.style.display = "none";
+    dashboard.classList.remove("hidden");
+    userDisplay.textContent = user.displayName || user.email || "User";
     listenToHistory();
-    listenForActiveChat();
     window.addEventListener("beforeunload", updateLastOnline);
     setInterval(updateLastOnline, 60000);
   } catch (err) {
-    if (loading) loading.textContent = "Error: " + err.message;
-    if (dashboard) dashboard.classList.add("hidden");
+    loading.textContent = "Error: " + err.message;
+    dashboard.classList.add("hidden");
     alert("Dashboard error: " + err.message);
   }
 });
@@ -114,6 +112,11 @@ tabBtns.forEach(btn => {
     tabContents.forEach(tc => tc.classList.remove("active"));
     btn.classList.add("active");
     $(btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "livechat") {
+      loadLiveChat();
+    } else {
+      if (livechatUnsub) livechatUnsub();
+    }
   };
 });
 
@@ -154,6 +157,8 @@ issueForm?.addEventListener("submit", async e => {
     const os = $("laptop-os")?.value;
     if (!proc || !os) return showMsg("Fill in all laptop details.");
     details = `Processor: ${proc}, OS: ${os}`;
+  } else if (devType === "other") {
+    details = "Other device";
   } else return showMsg("Choose a device type.");
   if (!desc) return showMsg("Please describe your issue.");
   if (lastUnresolvedIssue && !lastUnresolvedIssue.resolved) {
@@ -203,10 +208,8 @@ function listenToHistory() {
       .sort((a, b) => new Date(b.time) - new Date(a.time))
       .forEach(h => {
         const status = h.resolved
-          ? `<span style="color:#23a13a;font-weight:bold;vertical-align:middle;">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Resolved</span>`
-          : `<span style="color:#fa4d56;font-weight:bold;">Unresolved</span>`;
+          ? `<span class="resolved-tick">&#10003; Resolved</span>`
+          : `<span class="unresolved-tag">Unresolved</span>`;
         const li = document.createElement("li");
         li.innerHTML = `[${new Date(h.time).toLocaleString()}] (${h.device}) - ${h.desc} [${h.details}] ${status}`;
         historyList.appendChild(li);
@@ -216,53 +219,52 @@ function listenToHistory() {
   });
 }
 
-// --- Live Chat (User Side): Listen for messages on ANY unresolved issue ---
-function listenForActiveChat() {
+// --- Live Chat Tab: Always available, AI fallback until admin replies ---
+async function loadLiveChat() {
   if (!currentUser) return;
-  // Find their latest unresolved issue
+  // Find latest unresolved issue for this user
   const ref = doc(db, "users", currentUser.uid);
-  onSnapshot(ref, async (snap) => {
-    const userData = snap.exists() ? snap.data() : {};
-    const history = Array.isArray(userData.history) ? userData.history : [];
-    const unresolved = history.filter(h => !h.resolved).sort((a, b) => new Date(b.time) - new Date(a.time));
-    if (!unresolved.length) {
-      hideChatBox();
-      return;
+  const snap = await getDoc(ref);
+  const userData = snap.exists() ? snap.data() : {};
+  const history = Array.isArray(userData.history) ? userData.history : [];
+  const unresolved = history.filter(h => !h.resolved).sort((a, b) => new Date(b.time) - new Date(a.time));
+  if (!unresolved.length) {
+    livechatMessages.innerHTML = "<div style='color:#888'>No open issues to chat about.</div>";
+    livechatForm.style.display = "none";
+    return;
+  }
+  const issue = unresolved[0];
+  livechatForm.style.display = "";
+  livechatInput.disabled = false;
+
+  // Listen to the chat for this issue
+  if (livechatUnsub) livechatUnsub();
+  livechatUnsub = onSnapshot(
+    collection(db, "chats", currentUser.uid, "messages"),
+    snap => {
+      livechatMessages.innerHTML = '';
+      let hasAdmin = false;
+      snap.docs
+        .filter(d => d.data().issueTime === issue.time)
+        .sort((a, b) => a.data().timestamp - b.data().timestamp)
+        .forEach(d => {
+          const m = d.data();
+          if (m.from === "admin") hasAdmin = true;
+          // WhatsApp style bubbles
+          const div = document.createElement("div");
+          div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
+          div.innerHTML = `<span class="wa-bubble ${m.from === "user" ? "user" : "admin"}">${m.text}</span>`;
+          livechatMessages.appendChild(div);
+        });
+      livechatMessages.scrollTop = livechatMessages.scrollHeight;
+      livechatForm.dataset.hasAdmin = hasAdmin ? "1" : "";
     }
-    // Now, see if there are any admin messages for any unresolved issue
-    const currentIssue = unresolved[0];
-    showChatBox(currentIssue);
-  });
-}
+  );
 
-function showChatBox(issue) {
-  if (!chatSection) return;
-  chatSection.style.display = "block";
-  if (chatUnsub) chatUnsub();
-  const ref = collection(db, "chats", currentUser.uid, "messages");
-  chatUnsub = onSnapshot(ref, snap => {
-    chatMessages.innerHTML = '';
-    snap.docs
-      .filter(d => d.data().issueTime === issue.time)
-      .sort((a, b) => a.data().timestamp - b.data().timestamp)
-      .forEach(d => {
-        const m = d.data();
-        const div = document.createElement("div");
-        div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
-        div.innerHTML = `<span class="wa-bubble ${m.from === "user" ? "user" : "admin"}">${m.text}</span>`;
-        chatMessages.appendChild(div);
-      });
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  });
-
-  // Enable chat input
-  chatForm.style.display = "";
-  chatInput.disabled = false;
-
-  chatForm.onsubmit = async (e) => {
+  // Handle sending a message: AI replies if no admin, else normal
+  livechatForm.onsubmit = async (e) => {
     e.preventDefault();
-    if (!currentUser) return;
-    const text = chatInput.value.trim();
+    const text = livechatInput.value.trim();
     if (!text) return;
     await addDoc(collection(db, "chats", currentUser.uid, "messages"), {
       text,
@@ -270,13 +272,18 @@ function showChatBox(issue) {
       timestamp: Date.now(),
       issueTime: issue.time
     });
-    chatInput.value = "";
-  };
-}
+    livechatInput.value = "";
 
-function hideChatBox() {
-  if (!chatSection) return;
-  chatSection.style.display = "none";
-  if (chatUnsub) chatUnsub();
-  chatForm.style.display = "none";
+    // If admin hasn't replied yet, bot auto-replies
+    if (!livechatForm.dataset.hasAdmin) {
+      setTimeout(async () => {
+        await addDoc(collection(db, "chats", currentUser.uid, "messages"), {
+          text: "AI: Thank you for your message! Our virtual assistant is here to help. If you need live support, an admin will join soon.",
+          from: "admin",
+          timestamp: Date.now(),
+          issueTime: issue.time
+        });
+      }, 700);
+    }
+  };
 }
