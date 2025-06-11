@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - styled new alerts, styled chat, real-time reply, remove resolved from alerts
+// TechFix Admin Dashboard - improved live chat flow for alert center
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -46,8 +46,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let chatUnsub = null;
-let currentChatUid = null;
-let currentIssue = null;
+let currentActiveAlert = null;
 
 // --------- AUTH ---------
 onAuthStateChanged(auth, user => {
@@ -62,7 +61,7 @@ onAuthStateChanged(auth, user => {
   if (loadingEl) loadingEl.style.display = "none";
   if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
-  listenAllUnresolvedIssues();
+  listenLiveAlerts();
 });
 
 // --------- USER DATA ---------
@@ -154,36 +153,33 @@ function formatDate(isoString) {
   return d.toLocaleString();
 }
 
-// --------- ALERT CENTER ---------
-function listenAllUnresolvedIssues() {
-  onSnapshot(collection(db, "users"), snapshot => {
+// --------- ALERT CENTER + LIVE CHAT ---------
+function listenLiveAlerts() {
+  onSnapshot(collection(db, "alerts"), (snapshot) => {
     let unresolved = [];
+    let inProgress = null;
     snapshot.forEach(docSnap => {
-      const user = docSnap.data();
-      if (Array.isArray(user.history)) {
-        user.history.forEach(issue => {
-          if (!issue.resolved) {
-            unresolved.push({
-              ...issue,
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || user.email,
-            });
-          }
-        });
+      const alert = docSnap.data();
+      if (alert.status === "in-progress") {
+        inProgress = { ...alert, id: docSnap.id };
+      } else if (alert.status === "new") {
+        unresolved.push({ ...alert, id: docSnap.id });
       }
     });
-    unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
-    alertList.innerHTML = '';
-    if (currentIssue) {
-      renderActiveIssue(currentIssue);
+
+    alertList.innerHTML = "";
+    if (inProgress) {
+      currentActiveAlert = inProgress;
+      renderActiveAlert(inProgress);
     } else {
-      unresolved.forEach(issue => renderUnresolved(issue));
+      currentActiveAlert = null;
+      unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
+      unresolved.forEach(alert => renderUnresolvedAlert(alert));
     }
   });
 }
 
-function renderUnresolved(issue) {
+function renderUnresolvedAlert(alert) {
   const li = document.createElement('li');
   li.innerHTML = `
     <div class="alert-card" style="
@@ -195,10 +191,10 @@ function renderUnresolved(issue) {
       border-left:5px solid #fa4d56; 
       position:relative;">
       <div style="font-weight:600;font-size:1.13em;color:#24292f;">
-        <span style="color:#fa4d56;">&#9888;</span> ${issue.displayName}
+        <span style="color:#fa4d56;">&#9888;</span> ${alert.email}
       </div>
-      <div style="margin:6px 0 0 0;">${issue.desc}</div>
-      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${issue.device}] ${issue.details || ""}</div>
+      <div style="margin:6px 0 0 0;">${alert.desc}</div>
+      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
       <button class="resolve-alert-btn" style="
         background:#fa4d56;color:#fff;
         border:none;border-radius:6px;
@@ -213,15 +209,16 @@ function renderUnresolved(issue) {
   `;
   alertList.appendChild(li);
   li.querySelector('.resolve-alert-btn').onclick = async () => {
-    currentIssue = issue;
-    renderActiveIssue(issue);
-    await ensureComplaintIsFirstMessage(issue);
-    openAdminChat(issue.uid, issue);
+    // Set this alert as in-progress and lock out others
+    await updateDoc(doc(db, "alerts", alert.id), {
+      status: "in-progress",
+      admin: auth.currentUser.email
+    });
   };
 }
 
-function renderActiveIssue(issue) {
-  alertList.innerHTML = '';
+function renderActiveAlert(alert) {
+  alertList.innerHTML = "";
   const li = document.createElement('li');
   li.innerHTML = `
     <div class="alert-card" style="
@@ -233,39 +230,30 @@ function renderActiveIssue(issue) {
       border-left:5px solid #16b978; 
       position:relative;">
       <div style="font-weight:600;font-size:1.13em;color:#24292f;">
-        <span style="color:#16b978;">&#128172;</span> ${issue.displayName}
+        <span style="color:#16b978;">&#128172;</span> ${alert.email}
       </div>
-      <div style="margin:6px 0 0 0;">${issue.desc}</div>
-      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${issue.device}] ${issue.details || ""}</div>
+      <div style="margin:6px 0 0 0;">${alert.desc}</div>
+      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${alert.device}] ${alert.details || ""}</div>
       <div style="margin:8px 0 2px 0;">
-        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Open Chat</button>
+        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Chat</button>
         <button class="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;">Mark as Resolved</button>
       </div>
     </div>
   `;
   alertList.appendChild(li);
-  li.querySelector('.chat-alert-btn').onclick = () => openAdminChat(issue.uid, issue);
+  li.querySelector('.chat-alert-btn').onclick = () => openAdminChat(alert.uid, alert);
   li.querySelector('.finish-alert-btn').onclick = async () => {
-    await markIssueResolved(issue.uid, issue.time);
-    currentIssue = null;
+    await markAlertAndUserHistoryResolved(alert);
     chatWindow.innerHTML = '';
   };
 }
 
 // --------- CHAT ---------
-async function ensureComplaintIsFirstMessage(issue) {
-  const chatColRef = collection(db, "chats", issue.uid, "messages");
-  const chatSnap = await getDocs(chatColRef);
-  if (chatSnap.empty) {
-    await addAdminChatMsg(issue.uid, `User complaint: ${issue.desc} (${issue.details})`);
-  }
-}
-
-function openAdminChat(uid, issue) {
+function openAdminChat(uid, alert) {
   chatWindow.innerHTML = `
     <div class="chatbox" style="background:#f9f9fa;border-radius:15px;box-shadow:0 2px 18px #0002;padding:0 0 10px 0;margin:8px 0 0 0;max-width:520px;">
       <div style="border-bottom:1px solid #e8e8e8;padding:12px 18px 10px 18px;font-weight:500;background:#fff;border-top-left-radius:15px;border-top-right-radius:15px;">
-        <span>&#128172; Chat with <span style="color:#16b978;font-weight:600;">${issue ? issue.displayName : ''}</span></span>
+        <span>&#128172; Chat with <span style="color:#16b978;font-weight:600;">${alert.email}</span></span>
       </div>
       <div id="admin-chat-messages" style="height:220px;overflow-y:auto;padding:15px 18px 5px 18px;background:#f9f9fa;"></div>
       <form id="admin-chat-form" style="display:flex;gap:8px;padding:0 14px 0 14px;margin-top:8px;">
@@ -274,19 +262,34 @@ function openAdminChat(uid, issue) {
       </form>
     </div>
   `;
-  chatInput = document.getElementById('input-chat-msg');
+  ensureComplaintIsFirstMessage(uid, alert);
   loadAdminChat(uid);
   const chatForm = document.getElementById('admin-chat-form');
+  const chatInput = document.getElementById('input-chat-msg');
   chatForm.onsubmit = async (e) => {
     e.preventDefault();
     if (chatInput.value.trim()) {
-      await addAdminChatMsg(uid, chatInput.value.trim());
+      await addDoc(collection(db, "chats", uid, "messages"), {
+        text: chatInput.value.trim(),
+        from: "admin",
+        timestamp: Date.now()
+      });
       chatInput.value = "";
     }
   };
 }
 
-// ...[all your code above remains unchanged up to loadAdminChat]...
+async function ensureComplaintIsFirstMessage(uid, alert) {
+  const chatColRef = collection(db, "chats", uid, "messages");
+  const chatSnap = await getDocs(chatColRef);
+  if (chatSnap.empty) {
+    await addDoc(chatColRef, {
+      text: `User complaint: ${alert.desc} (${alert.details})`,
+      from: "admin",
+      timestamp: Date.now()
+    });
+  }
+}
 
 function loadAdminChat(uid) {
   if (chatUnsub) chatUnsub();
@@ -305,7 +308,6 @@ function loadAdminChat(uid) {
           msgDiv.style.display = 'flex';
           msgDiv.style.justifyContent = isAdmin ? "flex-end" : "flex-start";
           msgDiv.style.margin = "5px 0";
-          // Use chat-message classes for consistent style
           msgDiv.innerHTML = `
             <span class="chat-message ${isAdmin ? "admin" : "user"}">
               ${msg.text}
@@ -318,13 +320,21 @@ function loadAdminChat(uid) {
   );
 }
 
-// ...[rest of your code remains unchanged]...
-async function addAdminChatMsg(uid, text) {
-  await addDoc(collection(db, "chats", uid, "messages"), {
-    text,
-    from: "admin",
-    timestamp: Date.now()
-  });
+async function markAlertAndUserHistoryResolved(alert) {
+  // Mark alert as resolved
+  await updateDoc(doc(db, "alerts", alert.id), { status: "resolved" });
+
+  // Mark user's history entry as resolved
+  const userDocRef = doc(db, "users", alert.uid);
+  const userDoc = await getDoc(userDocRef);
+  const userData = userDoc.data();
+  if (userData && Array.isArray(userData.history)) {
+    const idx = userData.history.findIndex(e => e.time === alert.time);
+    if (idx > -1) {
+      userData.history[idx].resolved = true;
+      await updateDoc(userDocRef, { history: userData.history });
+    }
+  }
 }
 
 // Logout
