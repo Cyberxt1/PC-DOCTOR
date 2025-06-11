@@ -1,4 +1,4 @@
-// TechFix User Dashboard - History, Troubleshoot, Ask AI, and always-on Chat with Admin/AI
+// TechFix User Dashboard - History, Troubleshoot, Ask AI, always-on Chat with Admin/AI, and new chat badge!
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -46,10 +46,15 @@ const livechatSection = $("livechat");
 const livechatMessages = $("livechat-messages");
 const livechatForm = $("livechat-form");
 const livechatInput = $("livechat-input");
+const chatBadge = $("chat-badge");
 
 let currentUser = null;
 let lastUnresolvedIssue = null;
 let livechatUnsub = null;
+let unreadAdminMsgCount = 0;
+let lastCheckedAdminMsgTimestamp = 0;
+let activeTab = "history";
+let monitorUnreadUnsub = null;
 
 // --- Auth ---
 onAuthStateChanged(auth, async user => {
@@ -66,6 +71,7 @@ onAuthStateChanged(auth, async user => {
     dashboard.classList.remove("hidden");
     userDisplay.textContent = user.displayName || user.email || "User";
     listenToHistory();
+    setupUnreadMonitor();
     window.addEventListener("beforeunload", updateLastOnline);
     setInterval(updateLastOnline, 60000);
   } catch (err) {
@@ -112,7 +118,10 @@ tabBtns.forEach(btn => {
     tabContents.forEach(tc => tc.classList.remove("active"));
     btn.classList.add("active");
     $(btn.dataset.tab).classList.add("active");
+    activeTab = btn.dataset.tab;
+    // When entering chat tab, clear unread badge
     if (btn.dataset.tab === "livechat") {
+      resetUnreadAdminMessages();
       loadLiveChat();
     } else {
       if (livechatUnsub) livechatUnsub();
@@ -244,12 +253,16 @@ async function loadLiveChat() {
     snap => {
       livechatMessages.innerHTML = '';
       let hasAdmin = false;
+      let latestAdminMsgTimestamp = lastCheckedAdminMsgTimestamp;
       snap.docs
         .filter(d => d.data().issueTime === issue.time)
         .sort((a, b) => a.data().timestamp - b.data().timestamp)
         .forEach(d => {
           const m = d.data();
-          if (m.from === "admin") hasAdmin = true;
+          if (m.from === "admin") {
+            hasAdmin = true;
+            if (m.timestamp > latestAdminMsgTimestamp) latestAdminMsgTimestamp = m.timestamp;
+          }
           // WhatsApp style bubbles
           const div = document.createElement("div");
           div.className = m.from === "user" ? "wa-chat-row wa-user" : "wa-chat-row wa-admin";
@@ -258,6 +271,8 @@ async function loadLiveChat() {
         });
       livechatMessages.scrollTop = livechatMessages.scrollHeight;
       livechatForm.dataset.hasAdmin = hasAdmin ? "1" : "";
+      // When viewing chat, reset unread badge and update last checked
+      resetUnreadAdminMessages(latestAdminMsgTimestamp);
     }
   );
 
@@ -288,13 +303,74 @@ async function loadLiveChat() {
   };
 }
 
+// --- Monitor for Unread Admin Messages (for badge) ---
+function setupUnreadMonitor() {
+  // Wait for auth/user loaded
+  if (!currentUser) return;
+  // Find latest unresolved issue for this user
+  const ref = doc(db, "users", currentUser.uid);
+  getDoc(ref).then(snap => {
+    const userData = snap.exists() ? snap.data() : {};
+    const history = Array.isArray(userData.history) ? userData.history : [];
+    const unresolved = history.filter(h => !h.resolved).sort((a, b) => new Date(b.time) - new Date(a.time));
+    if (!unresolved.length) return;
+    const issue = unresolved[0];
+    monitorUnreadAdminMessages(issue);
+  });
+}
+
+function monitorUnreadAdminMessages(issue) {
+  if (monitorUnreadUnsub) monitorUnreadUnsub();
+  monitorUnreadUnsub = onSnapshot(
+    collection(db, "chats", currentUser.uid, "messages"),
+    snap => {
+      if (activeTab === "livechat") {
+        // User is in chat tab, don't show badge
+        showChatBadge(0);
+        return;
+      }
+      let unread = 0;
+      snap.docs
+        .filter(d => d.data().issueTime === issue.time)
+        .forEach(d => {
+          const m = d.data();
+          if (
+            m.from === "admin" &&
+            (!lastCheckedAdminMsgTimestamp || m.timestamp > lastCheckedAdminMsgTimestamp)
+          ) {
+            unread++;
+          }
+        });
+      unreadAdminMsgCount = unread;
+      showChatBadge(unreadAdminMsgCount);
+    }
+  );
+}
+
+function showChatBadge(count) {
+  if (!chatBadge) return;
+  chatBadge.textContent = count > 0 ? count : "";
+  chatBadge.style.display = count > 0 ? "inline-block" : "none";
+}
+
+function resetUnreadAdminMessages(newTimestamp) {
+  unreadAdminMsgCount = 0;
+  if (chatBadge) chatBadge.style.display = "none";
+  if (typeof newTimestamp === "number" && newTimestamp > lastCheckedAdminMsgTimestamp) {
+    lastCheckedAdminMsgTimestamp = newTimestamp;
+  } else {
+    lastCheckedAdminMsgTimestamp = Date.now();
+  }
+}
 
 // Export User History as CSV
 document.getElementById('export-history-btn').onclick = function() {
   if (!currentUser) return;
-  let rows = [["Device","Description","Details","Time","Resolved"]];
-  if (Array.isArray(currentUser.history)) {
-    currentUser.history.forEach(h => {
+  // Use Firestore to always get latest
+  getDoc(doc(db, "users", currentUser.uid)).then(snap => {
+    let rows = [["Device","Description","Details","Time","Resolved"]];
+    const history = Array.isArray(snap.data()?.history) ? snap.data().history : [];
+    history.forEach(h => {
       rows.push([
         h.device||"",
         h.desc||"",
@@ -303,13 +379,13 @@ document.getElementById('export-history-btn').onclick = function() {
         h.resolved ? "Yes" : "No"
       ]);
     });
-  }
-  const csv = rows.map(r=>r.map(x=>`"${(x||'').replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], {type: 'text/csv'});
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "techfix_history.csv";
-  link.click();
+    const csv = rows.map(r=>r.map(x=>`"${(x||'').replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "techfix_history.csv";
+    link.click();
+  });
 };
 
 // Clear User History
