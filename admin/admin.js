@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - Alerts always visible, open chat per alert, WhatsApp-style chat
+// TechFix Admin Dashboard -- ALL unresolved alerts visible, click to chat, resolve inside chat
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -15,11 +15,12 @@ import {
   orderBy
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
+// ---- CONFIG ----
 const firebaseConfig = {
   apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
   authDomain: "techfix-ef115.firebaseapp.com",
   projectId: "techfix-ef115",
-  storageBucket: "techfix-ef115.firebasestorage.app",
+  storageBucket: "techfix-ef115.appspot.com",
   messagingSenderId: "798114675752",
   appId: "1:798114675752:web:33450b57585b4a643b891d",
   measurementId: "G-69MKL5ETH7"
@@ -29,7 +30,7 @@ const ADMIN_EMAILS = [
   "oluokundavid4@gmail.com"
 ];
 
-// DOM selectors
+// ---- DOM ----
 const loadingEl = document.getElementById("loading");
 const appContainer = document.querySelector(".app-container");
 const statTotalUsers = document.querySelectorAll('.stat-value')[0];
@@ -41,13 +42,15 @@ const logsTbody = document.getElementById('logs-tbody');
 const alertList = document.querySelector('.alert-list');
 const chatWindow = document.querySelector('.chat-window');
 
+// ---- FIREBASE ----
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let activeChat = null; // currently open chat (alert object)
-let chatUnsub = null;  // function to unsubscribe from chat snapshot
+let activeChat = null; // active alert object
+let chatUnsub = null;
 
+// ---- AUTH ----
 onAuthStateChanged(auth, user => {
   if (!user || !ADMIN_EMAILS.includes(user.email)) {
     if (appContainer) appContainer.style.display = "none";
@@ -63,7 +66,7 @@ onAuthStateChanged(auth, user => {
   loadAlerts();
 });
 
-// --------- USER DATA (existing dashboard stats/tables) ---------
+// ---- USER DATA (stats/tables) ----
 function liveLoadUsers() {
   const usersCol = collection(db, "users");
   onSnapshot(usersCol, (snapshot) => {
@@ -152,7 +155,7 @@ function formatDate(isoString) {
   return d.toLocaleString();
 }
 
-// --------- ALERTS & CHAT ---------
+// ---- ALERTS & CHAT ----
 function loadAlerts() {
   const alertsRef = collection(db, "alerts");
   const q = query(alertsRef, orderBy("time", "desc"));
@@ -162,11 +165,12 @@ function loadAlerts() {
     snapshot.forEach(docSnap => {
       const alert = docSnap.data();
       alert.id = docSnap.id;
+      // ALL alerts except "resolved" show up
       if (alert.status !== "resolved") {
         unresolvedAlerts.push(alert);
       }
     });
-    // If active chat is resolved, close its window
+    // Remove chat if alert was resolved elsewhere
     if (activeChat && !unresolvedAlerts.some(a => a.id === activeChat.id)) {
       closeChat();
     }
@@ -175,15 +179,27 @@ function loadAlerts() {
 }
 
 function renderAlert(alert) {
+  // Show status badge for clarity
+  const statusColor = alert.status === "new"
+    ? "#fa4d56" : alert.status === "pending"
+    ? "#f1c21b" : "#16b978";
+  const statusLabel = alert.status.charAt(0).toUpperCase() + alert.status.slice(1);
+
   const li = document.createElement('li');
   li.className = "alert-card";
   li.style = "background:#fff; border-radius:12px; margin:10px 0; padding:16px; border-left:5px solid #fa4d56;";
   li.innerHTML = `
-    <div><b>${alert.email}</b> <span style="color:#888;">(${alert.device})</span></div>
+    <div>
+      <b>${alert.email}</b>
+      <span style="color:#888;">(${alert.device})</span>
+      <span style="margin-left:14px;padding:2px 13px 2px 13px;border-radius:8px;font-size:.98em;background:${statusColor};color:#fff;">
+        ${statusLabel}
+      </span>
+    </div>
     <div style="margin:6px 0;">${alert.desc}</div>
     <div style="color:#888;font-size:.98em;">${alert.details || ""}</div>
     <button class="open-chat-btn" style="margin-top:10px;padding:6px 16px;border-radius:6px;background:${activeChat&&activeChat.id===alert.id?"#16b978":"#fa4d56"};color:#fff;border:none;">
-      ${activeChat && activeChat.id === alert.id ? "Chatting..." : "Open Chat"}
+      ${activeChat && activeChat.id === alert.id ? "Chatting..." : "Chat & Resolve"}
     </button>
   `;
   alertList.appendChild(li);
@@ -209,9 +225,9 @@ function renderChatWindow(alert) {
       <form id="admin-chat-form" style="display:flex;gap:8px;padding:0 14px 0 14px;margin-top:8px;">
         <input type="text" id="input-chat-msg" style="flex:1;padding:10px;border-radius:7px;border:1px solid #cacaca;font-size:1em;" placeholder="Type your message..." autocomplete="off" required />
         <button type="submit" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;">Send</button>
+        <button type="button" id="resolve-in-chat-btn" style="background:#fa4d56;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin-left:6px;">Mark as Resolved</button>
       </form>
-      <button id="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin:12px 0 0 16px;">Mark as Resolved</button>
-      <button id="close-chat-btn" style="background:#fa4d56;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin:12px 0 0 16px;">Close Chat</button>
+      <button id="close-chat-btn" style="background:#777;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin:16px 0 0 16px;">Close Chat</button>
     </div>
   `;
   loadChat(alert.uid);
@@ -228,13 +244,11 @@ function renderChatWindow(alert) {
     });
     chatInput.value = "";
   };
-
-  // Mark as resolved (update alert to resolved)
-  document.getElementById('finish-alert-btn').onclick = async () => {
-    await updateDoc(doc(db, "alerts", alert.id), { status: "resolved" });
+  // Mark as resolved in chat
+  document.getElementById('resolve-in-chat-btn').onclick = async () => {
+    await resolveAlert(alert);
     closeChat();
   };
-
   // Just close the chat window, don't resolve
   document.getElementById('close-chat-btn').onclick = closeChat;
 }
@@ -261,13 +275,33 @@ function loadChat(uid) {
   );
 }
 
+async function resolveAlert(alert) {
+  // 1. Mark alert as resolved
+  await updateDoc(doc(db, "alerts", alert.id), { status: "resolved" });
+  // 2. Mark user's matching history entry as resolved (if any)
+  if (alert.uid && alert.time) {
+    const userDocRef = doc(db, "users", alert.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      if (Array.isArray(userData.history)) {
+        const idx = userData.history.findIndex(e => e.time === alert.time);
+        if (idx > -1) {
+          userData.history[idx].resolved = true;
+          await updateDoc(userDocRef, { history: userData.history });
+        }
+      }
+    }
+  }
+}
+
 function closeChat() {
   activeChat = null;
   chatWindow.innerHTML = "";
   if (chatUnsub) chatUnsub();
 }
 
-// Logout
+// ---- LOGOUT ----
 const logoutLink = document.getElementById('logout-link');
 if (logoutLink) {
   logoutLink.addEventListener('click', function (e) {
