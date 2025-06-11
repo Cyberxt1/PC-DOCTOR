@@ -30,63 +30,70 @@
       <h1>Fix Your Device Problems Fast and with Ease</h1>
       <p>
         Whether it’s your laptop, smartphone or tablet, we diagnose and solve your tech issues quickly and reliably.
-        Get back to what matters, hassle-free!
+        Get back to what matters, hassle-free!  <a href="./login/login.html" style="color: blue;">Log in now</a>
       </p>
-      <a href="#complaint-form" class="cta-btn">Submit a Complaint</a>
+      <div style="display: flex;"><a href="#complaint-form" style="text-decoration: none; " class="cta-btn">Submit a Complaint</a>
+        <a href="./login/login.html" class="cta-btn hide-cta">Login</a>
+      </div>
     </div>
     <div class="hero-image">
-      <img src="./images/fixImage"
-        alt="Device Repair" />
+      <img src="./images/fixImage" alt="Device Repair" />
     </div>
   </header>
 
   <!-- About Section -->
   <section class="about" id="about">
-  <div class="about-content">
-    <h2>About TechFix</h2>
-    <p>
-      TechFix is your go-to solution for fast, professional device repairs and troubleshooting. Our certified experts handle hardware and software issues for all major brands, ensuring your devices run smoothly with minimal downtime.
-    </p>
-    <p>
-      We believe tech problems shouldn't feel like the end of the world. Whether it’s a frozen screen, lagging system, charging issue, or just something “off,” TechFix connects you to real help not guesswork.
-    </p>
-    <ul>
-      <li><strong>Care first:</strong> Only verified troubleshooters, trained to treat every device with respect.</li>
-      <li><strong>Smart matching:</strong> Describe your problem once and connect to experts, saving you time and hassle.</li>
-      <li><strong>Stay in control:</strong> You get updates, your device stays safe, and there are no surprise repairs or hidden costs.</li>
-    </ul>
-    <p>
-      <strong>For Users:</strong> No account needed. Log in with Google, describe your issue, and we’ll handle the rest.<br>
-      <strong>For Troubleshooters:</strong> Join a community of skilled pros. Get matched to complaints based on your skills, no chaos, no hustle.
-    </p>
-    <p>
-      TechFix is just getting started. Soon, we’ll open physical locations to train, equip, and support the best troubleshooters nationwide; making tech help smarter, safer, and more trusted.
-    </p>
-    <ul>
-      <li>Free diagnostics & transparent pricing</li>
-      <li>Repairs for phones, laptops, tablets, and more</li>
-      <li>Quick turnaround & friendly support</li>
-      <li>100% satisfaction guarantee</li>
-    </ul>
-    <p>
-      Got a tech problem? Let’s fix it the right way.
-    </p>
-  </div>
-</section>
+    <div class="about-content">
+      <h2>About TechFix</h2>
+      <p>
+        TechFix is your go-to solution for fast, professional device repairs and troubleshooting. Our certified experts
+        handle hardware and software issues for all major brands, ensuring your devices run smoothly with minimal
+        downtime.
+      </p>
+      <p>
+        We believe tech problems shouldn't feel like the end of the world. Whether it’s a frozen screen, lagging system,
+        charging issue, or just something “off,” TechFix connects you to real help not guesswork.
+      </p>
+      <ul>
+        <li><strong>Care first:</strong> Only verified troubleshooters, trained to treat every device with respect.</li>
+        <li><strong>Smart matching:</strong> Describe your problem once and connect to experts, saving you time and
+          hassle.</li>
+        <li><strong>Stay in control:</strong> You get updates, your device stays safe, and there are no surprise repairs
+          or hidden costs.</li>
+      </ul>
+      <p>
+        <strong>For Users:</strong> No account needed. Log in with Google, describe your issue, and we’ll handle the
+        rest.<br>
+        <strong>For Troubleshooters:</strong> Join a community of skilled pros. Get matched to complaints based on your
+        skills, no chaos, no hustle.
+      </p>
+      <p>
+        TechFix is just getting started. Soon, we’ll open physical locations to train, equip, and support the best
+        troubleshooters nationwide; making tech help smarter, safer, and more trusted.
+      </p>
+      <ul>
+        <li>Free diagnostics & transparent pricing</li>
+        <li>Repairs for phones, laptops, tablets, and more</li>
+        <li>Quick turnaround & friendly support</li>
+        <li>100% satisfaction guarantee</li>
+      </ul>
+      <p>
+        Got a tech problem? Let’s fix it the right way. <a href="./login/login.html" style="color: blue;">Log in</a>
+        With Google easily
+      </p>
+    </div>
+  </section>
 
   <!-- Complaint Form Section -->
   <section class="complaint-form-section" id="complaint-form">
     <div class="form-container">
       <h2>Submit Your Device Issue</h2>
       <form id="complaintForm">
-        <label for="name">Your Name</label>
-        <input type="text" id="name" required placeholder="Enter your name" />
-
         <label for="email">Email</label>
-        <input type="email" id="email" required placeholder="you@example.com" />
+        <input type="email" id="email" required placeholder="you@example.com" disabled />
 
         <label for="device">Device Type</label>
-        <select id="device" required>
+        <select id="device" required disabled>
           <option value="">Select device</option>
           <option>Phone</option>
           <option>Laptop</option>
@@ -95,30 +102,19 @@
         </select>
 
         <label for="issue">Describe the Problem</label>
-        <textarea id="issue" rows="4" required placeholder="Briefly describe your issue"></textarea>
+        <textarea id="issue" rows="4" disabled required placeholder="Try Loggin In, AI is Coming Soon"></textarea>
 
-        <button type="submit" class="cta-btn">Submit</button>
+        <button type="submit" class=" new-btn" disabled>Submit</button>
         <div class="form-message" id="formMessage"></div>
       </form>
     </div>
   </section>
 
-  <!-- Login Section
-  <section class="login-section" id="login">
-    <div class="login-container">
-      <h2>Login</h2>
-      <form id="loginForm">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" required placeholder="you@example.com" />
 
-        <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" required placeholder="Enter your password" />
 
-        <button type="submit" class="cta-btn">Login</button>
-        <div class="form-message" id="loginMessage"></div>
-      </form>
-    </div>
-  </section> -->
+  <a href="./login/login.html"><button type="submit" class="cta-btn">Login</button></a>
+  </div>
+  </section>
 
   <!-- Footer -->
   <footer class="footer">
@@ -131,65 +127,65 @@
     </div>
   </footer>
 
- <!-- Firebase SDKs -->
-<script type="module">
-  // Import Firebase modules
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+  <!-- Firebase SDKs -->
+  <script type="module">
+    // Import Firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-  // Your Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
-    authDomain: "techfix-ef115.firebaseapp.com",
-    projectId: "techfix-ef115",
-    storageBucket: "techfix-ef115.appspot.com",
-    messagingSenderId: "798114675752",
-    appId: "1:798114675752:web:33450b57585b4a643b891d",
-    measurementId: "G-69MKL5ETH7"
-  };
+    // Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyB9aIZfqZvtfOSNUHGRSDXMyWDxWWS5NNs",
+      authDomain: "techfix-ef115.firebaseapp.com",
+      projectId: "techfix-ef115",
+      storageBucket: "techfix-ef115.appspot.com",
+      messagingSenderId: "798114675752",
+      appId: "1:798114675752:web:33450b57585b4a643b891d",
+      measurementId: "G-69MKL5ETH7"
+    };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  // Handle complaint form submission
-  document.getElementById("complaintForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+    // Handle complaint form submission
+    document.getElementById("complaintForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    const name = document.getElementById("name").value.trim();
-    const email = document.getElementById("email").value.trim();
-    const device = document.getElementById("device").value.trim();
-    const issue = document.getElementById("issue").value.trim();
-    const formMessage = document.getElementById("formMessage");
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const device = document.getElementById("device").value.trim();
+      const issue = document.getElementById("issue").value.trim();
+      const formMessage = document.getElementById("formMessage");
 
-    try {
-      await addDoc(collection(db, "complaints"), {
-        name,
-        email,
-        device,
-        issue,
-        timestamp: new Date()
-      });
+      try {
+        await addDoc(collection(db, "complaints"), {
+          name,
+          email,
+          device,
+          issue,
+          timestamp: new Date()
+        });
 
-      formMessage.textContent = "Complaint submitted successfully!";
-      formMessage.style.color = "green";
-      document.getElementById("complaintForm").reset();
-    } catch (error) {
-      console.error("Error submitting complaint:", error);
-      formMessage.textContent = "Failed to submit complaint. Please try again.";
-      formMessage.style.color = "red";
-    }
-  });
-</script>
+        formMessage.textContent = "Complaint submitted successfully!";
+        formMessage.style.color = "green";
+        document.getElementById("complaintForm").reset();
+      } catch (error) {
+        console.error("Error submitting complaint:", error);
+        formMessage.textContent = "Failed to submit complaint. Please try again.";
+        formMessage.style.color = "red";
+      }
+    });
+  </script>
 
-<script>
-  const navToggle = document.getElementById('navToggle');
-  const navLinks = document.getElementById('navLinks');
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
 
-  navToggle.addEventListener('click', () => {
-    navLinks.classList.toggle('active');
-  });
-</script>
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+    });
+  </script>
 
 
 </body>
