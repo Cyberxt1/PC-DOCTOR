@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - Device Status, Logs, Alert Center, Per-Issue Live Chat
+// TechFix Admin Dashboard - Device Status, Logs, Alert Center, Per-Issue Live Chat (fixed)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -162,6 +162,12 @@ async function markIssueResolved(userId, entryTime) {
   }
 }
 
+function formatDate(isoString) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  return d.toLocaleString();
+}
+
 // --------- ALERT CENTER ---------
 function updateAlerts(users) {
   // Show ALL unresolved issues in alert center
@@ -182,6 +188,25 @@ function updateAlerts(users) {
   unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
   unresolved.forEach(issue => renderUnresolved(issue));
 }
+
+// Ensure user's complaint is first admin message for this issue
+async function ensureComplaintIsFirstMessage(issue) {
+  const chatColRef = collection(db, "chats", issue.uid, "messages");
+  const chatSnap = await getDocs(chatColRef);
+  // Only add the message if no admin message for this issue.time
+  const hasMsg = chatSnap.docs.some(doc =>
+    doc.data().from === "admin" && doc.data().issueTime === issue.time
+  );
+  if (!hasMsg) {
+    await addDoc(chatColRef, {
+      text: `User complaint: ${issue.desc} (${issue.details})`,
+      from: "admin",
+      timestamp: Date.now(),
+      issueTime: issue.time
+    });
+  }
+}
+
 function renderUnresolved(issue) {
   const li = document.createElement('li');
   li.innerHTML = `
@@ -212,6 +237,7 @@ function renderUnresolved(issue) {
   `;
   alertList.appendChild(li);
   li.querySelector('.resolve-alert-btn').onclick = async () => {
+    await ensureComplaintIsFirstMessage(issue); // Ensure complaint is shown as first admin message
     openAdminChat(issue);
   };
 }
@@ -235,9 +261,11 @@ function openAdminChat(issue) {
   `;
   loadAdminChat(issue.uid, issue.time);
 
-  document.getElementById('admin-chat-form').onsubmit = async (e) => {
+  // Always re-select and re-attach after rendering
+  const chatForm = document.getElementById('admin-chat-form');
+  const chatInput = document.getElementById('input-chat-msg');
+  chatForm.onsubmit = async (e) => {
     e.preventDefault();
-    const chatInput = document.getElementById('input-chat-msg');
     if (chatInput.value.trim()) {
       await addDoc(collection(db, "chats", issue.uid, "messages"), {
         text: chatInput.value.trim(),
@@ -295,12 +323,6 @@ function closeChat() {
   activeChat = null;
   chatWindow.innerHTML = "";
   if (chatUnsub) chatUnsub();
-}
-
-function formatDate(isoString) {
-  if (!isoString) return "";
-  const d = new Date(isoString);
-  return d.toLocaleString();
 }
 
 // Logout

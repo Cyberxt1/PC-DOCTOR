@@ -1,4 +1,4 @@
-// TechFix User Dashboard - Full rewrite: History, Troubleshoot, Ask AI, and always-on Chat with Admin/AI
+// TechFix User Dashboard - History, Troubleshoot, Ask AI, and always-on Chat with Admin/AI
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut

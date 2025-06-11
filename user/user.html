@@ -5,6 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>User Dashboard</title>
   <link rel="stylesheet" href="user.css" />
+
+   <style>
+    #loading {
+      text-align: center;
+      margin-top: 4em;
+      font-size: 1.3em;
+      display: block;
+    }
+
+    #dashboard.hidden {
+      display: none;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tab-btn.active {
+      background: #e2e2e2;
+    }
+  </style>
+  
 </head>
 <body>
   <div id="loading" class="centered">Loading...</div>
