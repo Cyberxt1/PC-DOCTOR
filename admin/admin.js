@@ -305,14 +305,8 @@ function loadAdminChat(uid) {
           const msg = docSnap.data();
           const isAdmin = msg.from === "admin";
           const msgDiv = document.createElement('div');
-          msgDiv.style.display = 'flex';
-          msgDiv.style.justifyContent = isAdmin ? "flex-end" : "flex-start";
-          msgDiv.style.margin = "5px 0";
-          msgDiv.innerHTML = `
-            <span class="chat-message ${isAdmin ? "admin" : "user"}">
-              ${msg.text}
-            </span>
-          `;
+          msgDiv.className = isAdmin ? "wa-chat-row wa-admin" : "wa-chat-row wa-user";
+          msgDiv.innerHTML = `<span class="wa-bubble ${isAdmin ? "admin" : "user"}">${msg.text}</span>`;
           adminChatMessages.appendChild(msgDiv);
         });
       adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
