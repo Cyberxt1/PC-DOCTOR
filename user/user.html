@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>User Dashboard</title>
   <link rel="stylesheet" href="user.css" />
 
-   <style>
+  <style>
     #loading {
       text-align: center;
       margin-top: 4em;
@@ -30,8 +31,9 @@
       background: #e2e2e2;
     }
   </style>
-  
+
 </head>
+
 <body>
   <div id="loading" class="centered">Loading...</div>
   <div id="dashboard" class="hidden">
@@ -49,7 +51,12 @@
     </div>
     <main>
       <section id="history" class="tab-content active">
-        <h2>Your Support History</h2>
+        <h2>Support History</h2>
+        <div style="margin-bottom:12px;">
+          <button id="export-history-btn" style="margin-right:8px;">Export History</button>
+          <button id="clear-history-btn">Clear History</button>
+        </div>
+        <ul id="history-list"></ul>
         <ul id="history-list"></ul>
       </section>
       <section id="troubleshoot" class="tab-content">
@@ -94,4 +101,5 @@
   </div>
   <script type="module" src="user.js"></script>
 </body>
+
 </html>

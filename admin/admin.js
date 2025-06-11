@@ -337,3 +337,39 @@ if (logoutLink) {
     signOut(auth).then(() => window.location.href = "../login/login.html?logout=1");
   });
 }
+
+
+// Export Logs as CSV
+document.getElementById('export-logs-btn').onclick = function() {
+  // Gather logs (allIssues from updateLogsTable, or fetch again here)
+  let rows = [["User Email","Device","Description","Details","Time","Resolved"]];
+  usersState.forEach(user => {
+    (user.history||[]).forEach(h => {
+      rows.push([
+        user.email,
+        h.device||"",
+        h.desc||"",
+        h.details||"",
+        h.time||"",
+        h.resolved ? "Yes" : "No"
+      ]);
+    });
+  });
+  const csv = rows.map(r=>r.map(x=>`"${(x||'').replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "techfix_logs.csv";
+  link.click();
+};
+
+// Clear All Logs
+document.getElementById('clear-logs-btn').onclick = async function() {
+  if (!confirm("Are you sure you want to clear ALL logs for all users? This cannot be undone!")) return;
+  for (let user of usersState) {
+    if (user.id) {
+      await updateDoc(doc(db, "users", user.id), { history: [] });
+    }
+  }
+  alert("All logs cleared.");
+};

@@ -287,3 +287,34 @@ async function loadLiveChat() {
     }
   };
 }
+
+
+// Export User History as CSV
+document.getElementById('export-history-btn').onclick = function() {
+  if (!currentUser) return;
+  let rows = [["Device","Description","Details","Time","Resolved"]];
+  if (Array.isArray(currentUser.history)) {
+    currentUser.history.forEach(h => {
+      rows.push([
+        h.device||"",
+        h.desc||"",
+        h.details||"",
+        h.time||"",
+        h.resolved ? "Yes" : "No"
+      ]);
+    });
+  }
+  const csv = rows.map(r=>r.map(x=>`"${(x||'').replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "techfix_history.csv";
+  link.click();
+};
+
+// Clear User History
+document.getElementById('clear-history-btn').onclick = async function() {
+  if (!confirm("Are you sure you want to clear ALL your history? This cannot be undone!")) return;
+  await updateDoc(doc(db, "users", currentUser.uid), { history: [] });
+  alert("Your history has been cleared.");
+};
