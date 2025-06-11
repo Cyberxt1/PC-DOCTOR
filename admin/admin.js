@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - Device Status, Logs, Alert Center, Per-Issue Live Chat (fixed)
+// TechFix Admin Dashboard - with working Resolve & Chat and admin send message
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -90,7 +90,7 @@ function updateDeviceTable(users) {
   users.forEach(user => {
     if (Array.isArray(user.history)) {
       user.history
-        .filter(issue => !issue.resolved) // Only pending
+        .filter(issue => !issue.resolved)
         .forEach(issue => {
           const tr = document.createElement('tr');
           let deviceLabel = issue.device === 'laptop'
@@ -193,7 +193,6 @@ function updateAlerts(users) {
 async function ensureComplaintIsFirstMessage(issue) {
   const chatColRef = collection(db, "chats", issue.uid, "messages");
   const chatSnap = await getDocs(chatColRef);
-  // Only add the message if no admin message for this issue.time
   const hasMsg = chatSnap.docs.some(doc =>
     doc.data().from === "admin" && doc.data().issueTime === issue.time
   );
@@ -237,8 +236,13 @@ function renderUnresolved(issue) {
   `;
   alertList.appendChild(li);
   li.querySelector('.resolve-alert-btn').onclick = async () => {
-    await ensureComplaintIsFirstMessage(issue); // Ensure complaint is shown as first admin message
-    openAdminChat(issue);
+    try {
+      await ensureComplaintIsFirstMessage(issue);
+      openAdminChat(issue);
+    } catch (err) {
+      alert("Error starting chat: " + err.message);
+      console.error(err);
+    }
   };
 }
 
@@ -261,7 +265,7 @@ function openAdminChat(issue) {
   `;
   loadAdminChat(issue.uid, issue.time);
 
-  // Always re-select and re-attach after rendering
+  // Attach chat form handler after rendering
   const chatForm = document.getElementById('admin-chat-form');
   const chatInput = document.getElementById('input-chat-msg');
   chatForm.onsubmit = async (e) => {
