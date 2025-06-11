@@ -364,12 +364,8 @@ document.getElementById('export-logs-btn').onclick = function() {
 };
 
 // Clear All Logs
-document.getElementById('clear-logs-btn').onclick = async function() {
-  if (!confirm("Are you sure you want to clear ALL logs for all users? This cannot be undone!")) return;
-  for (let user of usersState) {
-    if (user.id) {
-      await updateDoc(doc(db, "users", user.id), { history: [] });
-    }
-  }
-  alert("All logs cleared.");
+document.getElementById('clear-logs-btn').onclick = function() {
+  // Just clear the admin's table view (UI)
+  logsTbody.innerHTML = "";
+  alert("Logs table cleared for this session. User histories remain intact.");
 };
