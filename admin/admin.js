@@ -1,4 +1,4 @@
-// TechFix Admin Dashboard - styled new alerts, styled chat, real-time reply, remove resolved from alerts
+// TechFix Admin Dashboard - Device Status, Logs, Alert Center, Per-Issue Live Chat
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signOut
@@ -39,15 +39,14 @@ const deviceStatusTbody = document.getElementById('device-status-tbody');
 const logsTbody = document.getElementById('logs-tbody');
 const alertList = document.querySelector('.alert-list');
 const chatWindow = document.querySelector('.chat-window');
-let chatInput = document.getElementById('input-chat-msg');
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+let usersState = [];
+let activeChat = null;
 let chatUnsub = null;
-let currentChatUid = null;
-let currentIssue = null;
 
 // --------- AUTH ---------
 onAuthStateChanged(auth, user => {
@@ -62,7 +61,6 @@ onAuthStateChanged(auth, user => {
   if (loadingEl) loadingEl.style.display = "none";
   if (appContainer) appContainer.style.display = "block";
   liveLoadUsers();
-  listenAllUnresolvedIssues();
 });
 
 // --------- USER DATA ---------
@@ -71,11 +69,14 @@ function liveLoadUsers() {
   onSnapshot(usersCol, (snapshot) => {
     const users = [];
     snapshot.forEach(docSnap => {
-      users.push({ ...docSnap.data(), id: docSnap.id });
+      const data = docSnap.data();
+      users.push({ ...data, id: docSnap.id });
     });
+    usersState = users;
     updateStats(users);
     updateDeviceTable(users);
     updateLogsTable(users);
+    updateAlerts(users);
   });
 }
 function updateStats(users) {
@@ -87,23 +88,24 @@ function updateStats(users) {
 function updateDeviceTable(users) {
   deviceStatusTbody.innerHTML = "";
   users.forEach(user => {
-    if (Array.isArray(user.history) && user.history.length > 0) {
-      const latest = [...user.history].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
-      const tr = document.createElement('tr');
-      let deviceLabel = latest.device === 'laptop'
-        ? (latest.details.match(/Processor: (.*?),/) ? latest.details.match(/Processor: (.*?),/)[1] : "Laptop")
-        : (latest.device === 'phone'
-          ? (latest.details.match(/Model: (.*)/) ? latest.details.match(/Model: (.*)/)[1] : "Phone")
-          : "Other");
-      const status = latest.resolved ? "Fixed" : "Pending";
-      const badgeClass = latest.resolved ? "healthy" : "issues";
-      tr.innerHTML = `
-        <td>${deviceLabel}</td>
-        <td><span class="badge ${badgeClass}">${status}</span></td>
-        <td>${formatDate(latest.time)}</td>
-        <td>${user.email}</td>
-      `;
-      deviceStatusTbody.appendChild(tr);
+    if (Array.isArray(user.history)) {
+      user.history
+        .filter(issue => !issue.resolved) // Only pending
+        .forEach(issue => {
+          const tr = document.createElement('tr');
+          let deviceLabel = issue.device === 'laptop'
+            ? (issue.details.match(/Processor: (.*?),/) ? issue.details.match(/Processor: (.*?),/)[1] : "Laptop")
+            : (issue.device === 'phone'
+              ? (issue.details.match(/Model: (.*)/) ? issue.details.match(/Model: (.*)/)[1] : "Phone")
+              : "Other");
+          tr.innerHTML = `
+            <td>${deviceLabel}</td>
+            <td><span class="badge issues">Pending</span></td>
+            <td>${formatDate(issue.time)}</td>
+            <td>${user.email}</td>
+          `;
+          deviceStatusTbody.appendChild(tr);
+        });
     }
   });
 }
@@ -126,7 +128,13 @@ function updateLogsTable(users) {
       <td>${entry.device || "—"}</td>
       <td>${entry.desc || "—"}</td>
       <td>
-        ${entry.resolved ? "Resolved" : `<button class="resolve-btn" data-uid="${entry.uid}" data-time="${entry.time}">Mark Resolved</button>`}
+        ${entry.resolved
+          ? `<span class="badge healthy" style="padding:6px 12px;">Resolved</span>`
+          : `<button class="resolve-btn" data-uid="${entry.uid}" data-time="${entry.time}"
+              style="background:#fa4d56;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;box-shadow:0 1px 3px #0001;">
+              Mark as Resolved
+            </button>`
+        }
       </td>
     `;
     logsTbody.appendChild(tr);
@@ -138,6 +146,7 @@ function updateLogsTable(users) {
   });
 }
 async function markIssueResolved(userId, entryTime) {
+  // Mark user's issue as resolved
   const userDocRef = doc(db, "users", userId);
   const userDoc = await getDoc(userDocRef);
   const userData = userDoc.data();
@@ -147,42 +156,32 @@ async function markIssueResolved(userId, entryTime) {
     history[idx].resolved = true;
     await updateDoc(userDocRef, { history });
   }
-}
-function formatDate(isoString) {
-  if (!isoString) return "";
-  const d = new Date(isoString);
-  return d.toLocaleString();
+  // Close chat if necessary
+  if (activeChat && activeChat.uid === userId && activeChat.time === entryTime) {
+    closeChat();
+  }
 }
 
 // --------- ALERT CENTER ---------
-function listenAllUnresolvedIssues() {
-  onSnapshot(collection(db, "users"), snapshot => {
-    let unresolved = [];
-    snapshot.forEach(docSnap => {
-      const user = docSnap.data();
-      if (Array.isArray(user.history)) {
-        user.history.forEach(issue => {
-          if (!issue.resolved) {
-            unresolved.push({
-              ...issue,
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || user.email,
-            });
-          }
-        });
-      }
-    });
-    unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
-    alertList.innerHTML = '';
-    if (currentIssue) {
-      renderActiveIssue(currentIssue);
-    } else {
-      unresolved.forEach(issue => renderUnresolved(issue));
+function updateAlerts(users) {
+  // Show ALL unresolved issues in alert center
+  alertList.innerHTML = "";
+  let unresolved = [];
+  users.forEach(user => {
+    if (Array.isArray(user.history)) {
+      user.history
+        .filter(issue => !issue.resolved)
+        .forEach(issue => unresolved.push({
+          ...issue,
+          uid: user.id,
+          email: user.email,
+          displayName: user.displayName || user.email
+        }));
     }
   });
+  unresolved.sort((a, b) => new Date(b.time) - new Date(a.time));
+  unresolved.forEach(issue => renderUnresolved(issue));
 }
-
 function renderUnresolved(issue) {
   const li = document.createElement('li');
   li.innerHTML = `
@@ -200,101 +199,70 @@ function renderUnresolved(issue) {
       <div style="margin:6px 0 0 0;">${issue.desc}</div>
       <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${issue.device}] ${issue.details || ""}</div>
       <button class="resolve-alert-btn" style="
-        background:#fa4d56;color:#fff;
+        background:#2da654;color:#fff;
         border:none;border-radius:6px;
         font-weight:600;padding:6px 16px;
         margin-top:6px;cursor:pointer;
         font-size:.98em;
         box-shadow:0 1px 3px #0001;
         transition:background .2s;">
-        Resolve
+        Resolve & Chat
       </button>
     </div>
   `;
   alertList.appendChild(li);
   li.querySelector('.resolve-alert-btn').onclick = async () => {
-    currentIssue = issue;
-    renderActiveIssue(issue);
-    await ensureComplaintIsFirstMessage(issue);
-    openAdminChat(issue.uid, issue);
-  };
-}
-
-function renderActiveIssue(issue) {
-  alertList.innerHTML = '';
-  const li = document.createElement('li');
-  li.innerHTML = `
-    <div class="alert-card" style="
-      background:#e8ffe6;
-      border-radius:12px; 
-      box-shadow:0 2px 12px #0001;
-      margin:18px 0 10px 0;
-      padding:18px 18px 10px 18px;
-      border-left:5px solid #16b978; 
-      position:relative;">
-      <div style="font-weight:600;font-size:1.13em;color:#24292f;">
-        <span style="color:#16b978;">&#128172;</span> ${issue.displayName}
-      </div>
-      <div style="margin:6px 0 0 0;">${issue.desc}</div>
-      <div style="color:#888;font-size:.98em;margin-bottom:6px;">[${issue.device}] ${issue.details || ""}</div>
-      <div style="margin:8px 0 2px 0;">
-        <button class="chat-alert-btn" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;margin-right:8px;">Open Chat</button>
-        <button class="finish-alert-btn" style="background:#333;color:#fff;font-weight:600;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;">Mark as Resolved</button>
-      </div>
-    </div>
-  `;
-  alertList.appendChild(li);
-  li.querySelector('.chat-alert-btn').onclick = () => openAdminChat(issue.uid, issue);
-  li.querySelector('.finish-alert-btn').onclick = async () => {
-    await markIssueResolved(issue.uid, issue.time);
-    currentIssue = null;
-    chatWindow.innerHTML = '';
+    openAdminChat(issue);
   };
 }
 
 // --------- CHAT ---------
-async function ensureComplaintIsFirstMessage(issue) {
-  const chatColRef = collection(db, "chats", issue.uid, "messages");
-  const chatSnap = await getDocs(chatColRef);
-  if (chatSnap.empty) {
-    await addAdminChatMsg(issue.uid, `User complaint: ${issue.desc} (${issue.details})`);
-  }
-}
-
-function openAdminChat(uid, issue) {
+function openAdminChat(issue) {
+  activeChat = issue;
   chatWindow.innerHTML = `
     <div class="chatbox" style="background:#f9f9fa;border-radius:15px;box-shadow:0 2px 18px #0002;padding:0 0 10px 0;margin:8px 0 0 0;max-width:520px;">
       <div style="border-bottom:1px solid #e8e8e8;padding:12px 18px 10px 18px;font-weight:500;background:#fff;border-top-left-radius:15px;border-top-right-radius:15px;">
-        <span>&#128172; Chat with <span style="color:#16b978;font-weight:600;">${issue ? issue.displayName : ''}</span></span>
+        <span>&#128172; Chat with <span style="color:#16b978;font-weight:600;">${issue.displayName}</span></span>
       </div>
       <div id="admin-chat-messages" style="height:220px;overflow-y:auto;padding:15px 18px 5px 18px;background:#f9f9fa;"></div>
       <form id="admin-chat-form" style="display:flex;gap:8px;padding:0 14px 0 14px;margin-top:8px;">
         <input type="text" id="input-chat-msg" style="flex:1;padding:10px;border-radius:7px;border:1px solid #cacaca;font-size:1em;" placeholder="Type your message..." autocomplete="off" required />
         <button type="submit" style="background:#16b978;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;">Send</button>
+        <button type="button" id="resolve-in-chat-btn" style="background:#fa4d56;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin-left:6px;">Mark as Resolved</button>
       </form>
+      <button id="close-chat-btn" style="background:#777;color:#fff;font-weight:600;border:none;border-radius:7px;padding:8px 19px;cursor:pointer;margin:16px 0 0 16px;">Close Chat</button>
     </div>
   `;
-  chatInput = document.getElementById('input-chat-msg');
-  loadAdminChat(uid);
-  const chatForm = document.getElementById('admin-chat-form');
-  chatForm.onsubmit = async (e) => {
+  loadAdminChat(issue.uid, issue.time);
+
+  document.getElementById('admin-chat-form').onsubmit = async (e) => {
     e.preventDefault();
+    const chatInput = document.getElementById('input-chat-msg');
     if (chatInput.value.trim()) {
-      await addAdminChatMsg(uid, chatInput.value.trim());
+      await addDoc(collection(db, "chats", issue.uid, "messages"), {
+        text: chatInput.value.trim(),
+        from: "admin",
+        timestamp: Date.now(),
+        issueTime: issue.time
+      });
       chatInput.value = "";
     }
   };
+  document.getElementById('resolve-in-chat-btn').onclick = async () => {
+    await markIssueResolved(issue.uid, issue.time);
+    closeChat();
+  };
+  document.getElementById('close-chat-btn').onclick = closeChat;
 }
-
-function loadAdminChat(uid) {
+function loadAdminChat(uid, issueTime) {
   if (chatUnsub) chatUnsub();
   const adminChatMessages = document.getElementById("admin-chat-messages");
   chatUnsub = onSnapshot(
     collection(db, "chats", uid, "messages"),
     (snapshot) => {
-      if (!adminChatMessages) return;
       adminChatMessages.innerHTML = '';
       snapshot.docs
+        .filter(docSnap => docSnap.data().issueTime === issueTime)
         .sort((a, b) => a.data().timestamp - b.data().timestamp)
         .forEach(docSnap => {
           const msg = docSnap.data();
@@ -323,13 +291,16 @@ function loadAdminChat(uid) {
     }
   );
 }
+function closeChat() {
+  activeChat = null;
+  chatWindow.innerHTML = "";
+  if (chatUnsub) chatUnsub();
+}
 
-async function addAdminChatMsg(uid, text) {
-  await addDoc(collection(db, "chats", uid, "messages"), {
-    text,
-    from: "admin",
-    timestamp: Date.now()
-  });
+function formatDate(isoString) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  return d.toLocaleString();
 }
 
 // Logout
