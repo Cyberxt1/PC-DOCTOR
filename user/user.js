@@ -1,4 +1,5 @@
-// TechFix User Dashboard - Enhanced: no duplicate issues, WhatsApp chat style, instant admin messages
+// TechFix User Dashboard - Robust Version (prevents stuck on loading, safe on empty Firestore)
+// Requires: Firebase Authentication and Firestore
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
 import {
@@ -51,27 +52,27 @@ let lastUnresolvedIssue = null;
 
 // --- Authentication Listener ---
 onAuthStateChanged(auth, async user => {
-  if (!user) {
-    loading.style.display = "none";
-    dashboard.classList.add("hidden");
-    location.href = "../login/login.html";
-    return;
-  }
-  currentUser = user;
   try {
+    if (!user) {
+      if (loading) loading.style.display = "none";
+      if (dashboard) dashboard.classList.add("hidden");
+      window.location.href = "../login/login.html";
+      return;
+    }
+    currentUser = user;
     await syncUserProfile(user);
-    loading.style.display = "none";
-    dashboard.classList.remove("hidden");
-    userDisplay.textContent = user.displayName || user.email;
+    if (loading) loading.style.display = "none";
+    if (dashboard) dashboard.classList.remove("hidden");
+    if (userDisplay) userDisplay.textContent = user.displayName || user.email || "User";
 
     listenToHistory();
     listenToAlerts();
     window.addEventListener("beforeunload", updateLastOnline);
     setInterval(updateLastOnline, 60000);
   } catch (err) {
+    if (loading) loading.textContent = "Error: " + err.message;
+    if (dashboard) dashboard.classList.add("hidden");
     alert("Dashboard error: " + err.message);
-    loading.textContent = "Error: " + err.message;
-    dashboard.classList.add("hidden");
   }
 });
 
@@ -94,15 +95,17 @@ async function syncUserProfile(user) {
 
 async function updateLastOnline() {
   if (currentUser) {
-    await updateDoc(doc(db, "users", currentUser.uid), {
-      lastOnline: new Date().toISOString()
-    }).catch(() => {});
+    try {
+      await updateDoc(doc(db, "users", currentUser.uid), {
+        lastOnline: new Date().toISOString()
+      });
+    } catch (e) { /* ignore */ }
   }
 }
 
 // --- Logout ---
 logoutBtn?.addEventListener("click", () =>
-  signOut(auth).then(() => location.href = "../login/login.html")
+  signOut(auth).then(() => window.location.href = "../login/login.html")
 );
 
 // --- Tabs Navigation ---
@@ -139,7 +142,7 @@ deviceType?.addEventListener("change", () => {
 // --- Submit Issue Form ---
 issueForm?.addEventListener("submit", async e => {
   e.preventDefault();
-  if (!currentUser) return location.href = "../login/login.html";
+  if (!currentUser) return window.location.href = "../login/login.html";
 
   const desc = $("issue-desc").value.trim();
   const devType = deviceType.value;
@@ -188,32 +191,39 @@ issueForm?.addEventListener("submit", async e => {
 });
 
 function showMsg(msg, color = "#f44") {
+  if (!formMsg) return;
   formMsg.textContent = msg;
   formMsg.style.color = color;
-  setTimeout(() => formMsg.textContent = "", 4000);
+  setTimeout(() => { if (formMsg) formMsg.textContent = ""; }, 4000);
 }
 
 // --- History Updates ---
 function listenToHistory() {
+  if (!currentUser) return;
   const ref = doc(db, "users", currentUser.uid);
   onSnapshot(ref, snap => {
-    const history = snap.data()?.history || [];
+    const data = snap.exists() ? snap.data() : { history: [] };
+    const history = Array.isArray(data.history) ? data.history : [];
     // Find most recent unresolved issue for duplicate check
     lastUnresolvedIssue = history
       .filter(h => !h.resolved)
       .sort((a, b) => new Date(b.time) - new Date(a.time))[0] || null;
 
     historyList.innerHTML = history.length ? '' : '<li>No history yet.</li>';
-    [...history].sort((a, b) => new Date(b.time) - new Date(a.time)).forEach(h => {
-      const status = h.resolved
-        ? `<span style="color:#23a13a;font-weight:bold;vertical-align:middle;">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Resolved</span>`
-        : `<span style="color:#fa4d56;font-weight:bold;">Unresolved</span>`;
-      const li = document.createElement("li");
-      li.innerHTML = `[${new Date(h.time).toLocaleString()}] (${h.device}) - ${h.desc} [${h.details}] ${status}`;
-      historyList.appendChild(li);
-    });
+    [...history]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .forEach(h => {
+        const status = h.resolved
+          ? `<span style="color:#23a13a;font-weight:bold;vertical-align:middle;">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;"><circle cx="10" cy="10" r="10" fill="#23a13a"/><path d="M6.5 10.5L9 13L13.5 8.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Resolved</span>`
+          : `<span style="color:#fa4d56;font-weight:bold;">Unresolved</span>`;
+        const li = document.createElement("li");
+        li.innerHTML = `[${new Date(h.time).toLocaleString()}] (${h.device}) - ${h.desc} [${h.details}] ${status}`;
+        historyList.appendChild(li);
+      });
+  }, err => {
+    historyList.innerHTML = `<li style="color:red">Error loading history</li>`;
   });
 }
 
@@ -238,10 +248,15 @@ function listenToAlerts() {
       hideChatBox();
       currentAlertId = null;
     }
+  }, err => {
+    hideChatBox();
+    currentAlertId = null;
+    if (chatMessages) chatMessages.innerHTML = `<div style="color:red">Error loading chat</div>`;
   });
 }
 
 function showChatBox(isResolved = false, userConfirmed = false) {
+  if (!chatSection) return;
   chatSection.style.display = "block";
   if (chatUnsub) chatUnsub();
   const ref = collection(db, "chats", currentUser.uid, "messages");
@@ -278,6 +293,7 @@ function showChatBox(isResolved = false, userConfirmed = false) {
 }
 
 function hideChatBox() {
+  if (!chatSection) return;
   chatSection.style.display = "none";
   if (chatUnsub) chatUnsub();
   $("user-resolve-btn")?.remove();
